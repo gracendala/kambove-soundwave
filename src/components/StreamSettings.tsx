@@ -10,8 +10,10 @@ import { useToast } from "@/hooks/use-toast";
 import { z } from "zod";
 
 const streamSettingsSchema = z.object({
-  zeno_stream_url: z.string().max(500),
-  zeno_stream_key: z.string().max(200),
+  zeno_server: z.string().max(500),
+  zeno_port: z.string().regex(/^\d+$/, "Port invalide").max(5),
+  zeno_mount_point: z.string().max(200),
+  zeno_password: z.string().max(200),
   butt_port: z.string().regex(/^\d+$/, "Port invalide").max(5),
   butt_password: z.string().max(100),
   butt_mount_point: z.string().max(100),
@@ -24,8 +26,10 @@ export const StreamSettings = () => {
   const [loading, setLoading] = useState(false);
   const [metadataEnabled, setMetadataEnabled] = useState(true);
   const [settings, setSettings] = useState({
-    zeno_stream_url: '',
-    zeno_stream_key: '',
+    zeno_server: '',
+    zeno_port: '8000',
+    zeno_mount_point: '',
+    zeno_password: '',
     butt_port: '8000',
     butt_password: '',
     butt_mount_point: '/live',
@@ -52,8 +56,10 @@ export const StreamSettings = () => {
       });
 
       setSettings({
-        zeno_stream_url: settingsMap.zeno_stream_url || '',
-        zeno_stream_key: settingsMap.zeno_stream_key || '',
+        zeno_server: settingsMap.zeno_server || '',
+        zeno_port: settingsMap.zeno_port || '8000',
+        zeno_mount_point: settingsMap.zeno_mount_point || '',
+        zeno_password: settingsMap.zeno_password || '',
         butt_port: settingsMap.butt_port || '8000',
         butt_password: settingsMap.butt_password || '',
         butt_mount_point: settingsMap.butt_mount_point || '/live',
@@ -222,23 +228,53 @@ export const StreamSettings = () => {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="zeno-url">URL de Streaming Zeno.fm</Label>
+            <Label htmlFor="zeno-server">Serveur Zeno.fm</Label>
             <Input
-              id="zeno-url"
-              value={settings.zeno_stream_url}
-              onChange={(e) => setSettings({ ...settings, zeno_stream_url: e.target.value })}
-              placeholder="rtmp://stream.zeno.fm/your-key"
+              id="zeno-server"
+              value={settings.zeno_server}
+              onChange={(e) => setSettings({ ...settings, zeno_server: e.target.value })}
+              placeholder="stream.zeno.fm ou relay.zeno.fm"
             />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="zeno-key">Clé de Streaming</Label>
+            <Label htmlFor="zeno-port">Port Zeno.fm</Label>
             <Input
-              id="zeno-key"
-              type="password"
-              value={settings.zeno_stream_key}
-              onChange={(e) => setSettings({ ...settings, zeno_stream_key: e.target.value })}
-              placeholder="Votre clé de streaming"
+              id="zeno-port"
+              type="number"
+              value={settings.zeno_port}
+              onChange={(e) => setSettings({ ...settings, zeno_port: e.target.value })}
+              placeholder="8000"
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="zeno-mount">Point de Montage Zeno.fm</Label>
+            <Input
+              id="zeno-mount"
+              value={settings.zeno_mount_point}
+              onChange={(e) => setSettings({ ...settings, zeno_mount_point: e.target.value })}
+              placeholder="/live ou votre mount point"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="zeno-password">Mot de Passe Zeno.fm</Label>
+            <Input
+              id="zeno-password"
+              type="password"
+              value={settings.zeno_password}
+              onChange={(e) => setSettings({ ...settings, zeno_password: e.target.value })}
+              placeholder="Mot de passe fourni par Zeno.fm"
+            />
+          </div>
+          <div className="p-4 bg-muted/50 rounded-lg border border-border/50">
+            <p className="text-sm text-muted-foreground mb-2">
+              <strong>Configuration Liquidsoap pour Zeno.fm:</strong>
+            </p>
+            <code className="text-xs bg-card p-2 rounded block">
+              Serveur: {settings.zeno_server || 'stream.zeno.fm'}<br/>
+              Port: {settings.zeno_port}<br/>
+              Mount: {settings.zeno_mount_point || '/live'}<br/>
+              Password: [voir ci-dessus]
+            </code>
           </div>
           <div className="flex items-center justify-between p-4 bg-card rounded-lg border border-border/50">
             <div className="space-y-0.5">
