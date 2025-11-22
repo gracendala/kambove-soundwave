@@ -226,6 +226,25 @@ export const AudioLibrary = () => {
     }
 
     try {
+      // Check if song already exists in playlist
+      const { data: existingEntry, error: checkError } = await supabase
+        .from('playlist_songs')
+        .select('id')
+        .eq('playlist_id', selectedPlaylist)
+        .eq('song_id', selectedSongForPlaylist)
+        .maybeSingle();
+
+      if (checkError) throw checkError;
+
+      if (existingEntry) {
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: "Cette chanson est déjà dans la playlist"
+        });
+        return;
+      }
+
       // Get the current max position in the playlist
       const { data: existingSongs, error: fetchError } = await supabase
         .from('playlist_songs')
@@ -382,59 +401,51 @@ export const AudioLibrary = () => {
             <p className="text-sm">Essayez un autre terme de recherche</p>
           </div>
         ) : (
-          <ScrollArea className="h-[500px] rounded-md border border-border/50 p-3">
-            <div className="space-y-3">
-              {filteredSongs.map((song) => (
-                <Card
+          <ScrollArea className="h-[500px] rounded-md border border-border/50">
+            <div className="divide-y divide-border/50">
+              {filteredSongs.map((song, index) => (
+                <div
                   key={song.id}
-                  className="overflow-hidden transition-smooth hover:shadow-divine hover:border-accent/30 animate-fade-in"
+                  className="group flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors animate-fade-in"
                 >
-                  <div className="flex items-center justify-between px-3 py-2 bg-muted/20">
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
-                        <Music className="h-5 w-5 text-accent" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{song.title}</p>
-                        <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
-                          {song.artist && (
-                            <Badge variant="secondary" className="text-xs">
-                              {song.artist}
-                            </Badge>
-                          )}
-                          {song.duration && <span>{formatDuration(song.duration)}</span>}
-                          <span className="text-muted-foreground/60">{formatFileSize(song.file_size)}</span>
-                        </div>
-                      </div>
+                  <span className="text-sm text-muted-foreground w-8 flex-shrink-0">
+                    {index + 1}
+                  </span>
+                  <Music className="h-4 w-4 text-accent flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">{song.title}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      {song.artist && <span>{song.artist}</span>}
+                      {song.duration && <span>• {formatDuration(song.duration)}</span>}
                     </div>
-                    <div className="flex items-center gap-1 flex-shrink-0">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => openAddToPlaylistDialog(song.id)}
-                        title="Ajouter à une playlist"
-                        className="h-8 w-8"
-                      >
-                        <ListPlus className="h-4 w-4" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleDeleteSong(song.id, song.file_path)}
-                        title="Supprimer"
-                        className="h-8 w-8 text-destructive hover:text-destructive"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                    <div className="mt-2">
+                      <AudioPlayer 
+                        filePath={song.file_path} 
+                        title={song.title}
+                      />
                     </div>
                   </div>
-                  <CardContent className="p-3 pt-2">
-                    <AudioPlayer 
-                      filePath={song.file_path} 
-                      title={song.title}
-                    />
-                  </CardContent>
-                </Card>
+                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => openAddToPlaylistDialog(song.id)}
+                      title="Ajouter à une playlist"
+                      className="h-8 w-8"
+                    >
+                      <ListPlus className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="ghost"
+                      onClick={() => handleDeleteSong(song.id, song.file_path)}
+                      title="Supprimer"
+                      className="h-8 w-8 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
               ))}
             </div>
           </ScrollArea>
