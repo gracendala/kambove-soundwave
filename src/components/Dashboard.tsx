@@ -18,6 +18,10 @@ interface DashboardStats {
     artist: string;
     playCount: number;
   }>;
+  playsToday: number;
+  playsThisWeek: number;
+  playsThisMonth: number;
+  streamQuality: string;
 }
 
 export const Dashboard = () => {
@@ -28,7 +32,11 @@ export const Dashboard = () => {
     totalSongs: 0,
     upcomingEvents: 0,
     currentListeners: 0,
-    topSongs: []
+    topSongs: [],
+    playsToday: 0,
+    playsThisWeek: 0,
+    playsThisMonth: 0,
+    streamQuality: '128kbps'
   });
   const { toast } = useToast();
 
@@ -63,6 +71,29 @@ export const Dashboard = () => {
         .select('listener_count')
         .order('played_at', { ascending: false })
         .limit(1)
+        .maybeSingle();
+
+      // Get stats for today, this week, this month
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+
+      const [
+        { count: playsToday },
+        { count: playsThisWeek },
+        { count: playsThisMonth }
+      ] = await Promise.all([
+        supabase.from('play_stats').select('*', { count: 'exact', head: true }).gte('played_at', todayStart),
+        supabase.from('play_stats').select('*', { count: 'exact', head: true }).gte('played_at', weekStart),
+        supabase.from('play_stats').select('*', { count: 'exact', head: true }).gte('played_at', monthStart)
+      ]);
+
+      // Get stream quality from settings
+      const { data: qualityData } = await supabase
+        .from('radio_settings')
+        .select('setting_value')
+        .eq('setting_key', 'stream_quality')
         .maybeSingle();
 
       // Get top songs by play count
@@ -100,7 +131,11 @@ export const Dashboard = () => {
         totalSongs: songCount || 0,
         upcomingEvents: eventCount || 0,
         currentListeners: latestStats?.listener_count || 0,
-        topSongs
+        topSongs,
+        playsToday: playsToday || 0,
+        playsThisWeek: playsThisWeek || 0,
+        playsThisMonth: playsThisMonth || 0,
+        streamQuality: qualityData?.setting_value || '128kbps'
       });
     } catch (error: any) {
       toast({
@@ -249,15 +284,15 @@ export const Dashboard = () => {
               <CardContent className="space-y-4">
                 <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
                   <span className="text-sm font-medium">Aujourd'hui</span>
-                  <span className="text-lg font-bold text-accent">1,247</span>
+                  <span className="text-lg font-bold text-accent">{stats.playsToday.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
                   <span className="text-sm font-medium">Cette semaine</span>
-                  <span className="text-lg font-bold text-accent">8,956</span>
+                  <span className="text-lg font-bold text-accent">{stats.playsThisWeek.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center p-3 bg-muted/30 rounded-lg">
                   <span className="text-sm font-medium">Ce mois</span>
-                  <span className="text-lg font-bold text-accent">34,521</span>
+                  <span className="text-lg font-bold text-accent">{stats.playsThisMonth.toLocaleString()}</span>
                 </div>
               </CardContent>
             </Card>
@@ -335,16 +370,16 @@ export const Dashboard = () => {
                 </h4>
                 <div className="grid grid-cols-3 gap-4 text-center">
                   <div className="p-3 bg-muted/30 rounded-lg">
-                    <p className="text-2xl font-bold text-accent">24/7</p>
+                    <p className="text-2xl font-bold text-accent">{isLive ? '🔴 Live' : '⚫ Off'}</p>
                     <p className="text-xs text-muted-foreground">Diffusion</p>
                   </div>
                   <div className="p-3 bg-muted/30 rounded-lg">
-                    <p className="text-2xl font-bold text-accent">128kbps</p>
+                    <p className="text-2xl font-bold text-accent">{stats.streamQuality}</p>
                     <p className="text-xs text-muted-foreground">Qualité</p>
                   </div>
                   <div className="p-3 bg-muted/30 rounded-lg">
-                    <p className="text-2xl font-bold text-accent">0ms</p>
-                    <p className="text-xs text-muted-foreground">Latence</p>
+                    <p className="text-2xl font-bold text-accent">{stats.currentListeners}</p>
+                    <p className="text-xs text-muted-foreground">Auditeurs</p>
                   </div>
                 </div>
               </div>
