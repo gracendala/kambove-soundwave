@@ -10,6 +10,7 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   userRoles: string[];
+  loading: boolean;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -18,11 +19,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [userRoles, setUserRoles] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Set up auth state listener FIRST
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      (event, session) => {
         setSession(session);
         setUser(session?.user ?? null);
         
@@ -40,6 +42,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           setUserRoles([]);
         }
+        
+        setLoading(false);
       }
     );
 
@@ -57,6 +61,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setUserRoles([]);
         }
       }
+      
+      setLoading(false);
     });
 
     return () => subscription.unsubscribe();
@@ -93,6 +99,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!user,
         isAdmin: userRoles.includes('admin'),
         userRoles,
+        loading,
       }}
     >
       {children}
