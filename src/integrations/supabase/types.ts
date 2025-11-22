@@ -161,31 +161,46 @@ export type Database = {
         Row: {
           created_at: string
           created_by: string | null
-          day_of_week: number
-          end_time: string
+          day_of_week: number | null
+          description: string | null
+          end_time: string | null
+          event_type: string | null
           id: string
           playlist_id: string | null
-          start_time: string
+          scheduled_date: string | null
+          song_id: string | null
+          start_time: string | null
+          title: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           created_by?: string | null
-          day_of_week: number
-          end_time: string
+          day_of_week?: number | null
+          description?: string | null
+          end_time?: string | null
+          event_type?: string | null
           id?: string
           playlist_id?: string | null
-          start_time: string
+          scheduled_date?: string | null
+          song_id?: string | null
+          start_time?: string | null
+          title?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           created_by?: string | null
-          day_of_week?: number
-          end_time?: string
+          day_of_week?: number | null
+          description?: string | null
+          end_time?: string | null
+          event_type?: string | null
           id?: string
           playlist_id?: string | null
-          start_time?: string
+          scheduled_date?: string | null
+          song_id?: string | null
+          start_time?: string | null
+          title?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -194,6 +209,13 @@ export type Database = {
             columns: ["playlist_id"]
             isOneToOne: false
             referencedRelation: "playlists"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "scheduled_events_song_id_fkey"
+            columns: ["song_id"]
+            isOneToOne: false
+            referencedRelation: "songs"
             referencedColumns: ["id"]
           },
         ]
@@ -254,6 +276,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_upcoming_events: {
+        Args: { days_ahead?: number }
+        Returns: {
+          day_of_week: number
+          description: string
+          end_time: string
+          event_type: string
+          id: string
+          playlist_id: string
+          scheduled_date: string
+          song_artist: string
+          song_id: string
+          song_title: string
+          start_time: string
+          title: string
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
