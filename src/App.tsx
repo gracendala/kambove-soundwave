@@ -7,13 +7,14 @@ import { AuthProvider, useAuth } from "@/contexts/AuthContext";
 import { ProtectedRoute } from "@/components/ProtectedRoute";
 import Index from "./pages/Index";
 import Playlists from "./pages/Playlists";
+import Library from "./pages/Library";
 import Schedule from "./pages/Schedule";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 import { Button } from "@/components/ui/button";
-import { LogOut, Radio, Music, Calendar, Settings as SettingsIcon } from "lucide-react";
+import { LogOut, Radio, Music, Calendar, Settings as SettingsIcon, Library as LibraryIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const queryClient = new QueryClient({
@@ -31,6 +32,7 @@ function AppContent() {
 
   const tabs = [
     { path: "/", label: "Tableau de Bord", icon: Radio },
+    { path: "/library", label: "Bibliothèque", icon: LibraryIcon },
     { path: "/playlists", label: "Playlists", icon: Music },
     { path: "/schedule", label: "Programmes", icon: Calendar },
     { path: "/settings", label: "Paramètres", icon: SettingsIcon },
@@ -103,6 +105,7 @@ function AppContent() {
           <Route path="/login" element={<Login />} />
           <Route path="/install" element={<Install />} />
           <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
+          <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
           <Route path="/playlists" element={<ProtectedRoute><Playlists /></ProtectedRoute>} />
           <Route path="/schedule" element={<ProtectedRoute><Schedule /></ProtectedRoute>} />
           <Route path="/settings" element={<ProtectedRoute requireAdmin><Settings /></ProtectedRoute>} />

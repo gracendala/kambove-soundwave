@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Clock, Plus, Trash2, Loader2 } from "lucide-react";
-import { AudioLibrary } from "./AudioLibrary";
 import { ScheduledBroadcasts } from "./ScheduledBroadcasts";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
@@ -143,8 +142,6 @@ export const ScheduleManager = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <AudioLibrary />
-      
       <ScheduledBroadcasts />
 
       <div className="flex items-center justify-between">
