@@ -10,6 +10,7 @@ import Playlists from "./pages/Playlists";
 import Schedule from "./pages/Schedule";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
+import Install from "./pages/Install";
 import NotFound from "./pages/NotFound";
 import { Button } from "@/components/ui/button";
 import { LogOut, Radio, Music, Calendar, Settings as SettingsIcon } from "lucide-react";
@@ -100,6 +101,7 @@ function AppContent() {
       <main className="flex-1 container mx-auto px-6 py-8 overflow-auto">
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/install" element={<Install />} />
           <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
           <Route path="/playlists" element={<ProtectedRoute><Playlists /></ProtectedRoute>} />
           <Route path="/schedule" element={<ProtectedRoute><Schedule /></ProtectedRoute>} />
