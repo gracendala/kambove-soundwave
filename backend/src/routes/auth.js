@@ -68,6 +68,17 @@ router.post('/register', async (req, res) => {
     res.status(201).json({ message: 'Utilisateur créé', user });
   } catch (error) {
     console.error('Erreur register:', error);
+    
+    // Gérer les erreurs de contrainte unique (doublon username/email)
+    if (error.code === '23505') {
+      if (error.constraint === 'users_username_key') {
+        return res.status(409).json({ error: 'Ce nom d\'utilisateur est déjà pris' });
+      }
+      if (error.constraint === 'users_email_key') {
+        return res.status(409).json({ error: 'Cet email est déjà utilisé' });
+      }
+    }
+    
     res.status(500).json({ error: 'Erreur serveur' });
   }
 });
