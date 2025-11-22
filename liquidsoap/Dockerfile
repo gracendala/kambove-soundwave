@@ -1,5 +1,8 @@
 FROM savonet/liquidsoap:main
 
+# S'assurer d'avoir les privilèges root
+USER root
+
 # Installation de ffmpeg pour le support de différents formats audio
 RUN apt-get update && \
     apt-get install -y ffmpeg && \
