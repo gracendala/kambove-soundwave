@@ -3,21 +3,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Music, Plus, Play, Trash2, Edit, Clock, Loader2 } from "lucide-react";
+import { Music, Plus, Trash2, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { api } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
 interface Playlist {
-  id: number;
+  id: string;
   name: string;
   description?: string;
-  active: boolean;
-  song_count: number;
-  total_duration: number;
   created_at: string;
 }
 
@@ -36,8 +32,13 @@ export const PlaylistManager = () => {
   const loadPlaylists = async () => {
     try {
       setLoading(true);
-      const data = await api.getPlaylists() as Playlist[];
-      setPlaylists(data);
+      const { data, error } = await supabase
+        .from('playlists')
+        .select('*')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      setPlaylists(data || []);
     } catch (error: any) {
       toast({
         variant: "destructive",
@@ -60,7 +61,18 @@ export const PlaylistManager = () => {
     }
 
     try {
-      await api.createPlaylist(newPlaylistName, newPlaylistDesc);
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      const { error } = await supabase
+        .from('playlists')
+        .insert([{
+          name: newPlaylistName,
+          description: newPlaylistDesc || null,
+          created_by: user?.id
+        }]);
+
+      if (error) throw error;
+
       toast({
         title: "Succès",
         description: "Playlist créée avec succès"
@@ -78,11 +90,17 @@ export const PlaylistManager = () => {
     }
   };
 
-  const handleDeletePlaylist = async (id: number) => {
+  const handleDeletePlaylist = async (id: string) => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cette playlist ?")) return;
 
     try {
-      await api.deletePlaylist(id);
+      const { error } = await supabase
+        .from('playlists')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
       toast({
         title: "Succès",
         description: "Playlist supprimée"
@@ -95,12 +113,6 @@ export const PlaylistManager = () => {
         description: error.message || "Impossible de supprimer la playlist"
       });
     }
-  };
-
-  const formatDuration = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   if (loading) {
@@ -179,14 +191,11 @@ export const PlaylistManager = () => {
                     <div>
                       <CardTitle>{playlist.name}</CardTitle>
                       <CardDescription>
-                        {playlist.song_count} piste(s) • {formatDuration(playlist.total_duration)}
+                        Créée le {new Date(playlist.created_at).toLocaleDateString('fr-FR')}
                       </CardDescription>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
-                    {playlist.active && (
-                      <Badge className="bg-accent text-accent-foreground">Active</Badge>
-                    )}
                     <Button
                       size="icon"
                       variant="outline"

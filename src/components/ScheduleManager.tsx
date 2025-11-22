@@ -2,34 +2,32 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Calendar, Clock, Plus, Trash2, Music, Power, PowerOff, Upload, Loader2 } from "lucide-react";
+import { Clock, Plus, Trash2, Music, Power, PowerOff, Upload, Loader2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { api } from "@/lib/api";
+import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 
 interface Song {
-  id: number;
+  id: string;
   title: string;
-  artist: string;
-  duration: number;
-  album?: string;
-  created_at?: string;
+  artist?: string;
+  duration?: number;
+  file_path: string;
+  created_at: string;
 }
 
 interface ScheduledEvent {
-  id: number;
-  name: string;
-  song_id: number;
-  scheduled_time: string;
-  days_of_week: number[];
-  active: boolean;
-  song_title?: string;
-  artist?: string;
+  id: string;
+  playlist_id?: string;
+  day_of_week: number;
+  start_time: string;
+  end_time: string;
+  created_at: string;
 }
 
 export const ScheduleManager = () => {
@@ -42,20 +40,19 @@ export const ScheduleManager = () => {
   const { toast } = useToast();
 
   const [newEvent, setNewEvent] = useState({
-    name: "",
-    songId: "",
-    time: "",
-    daysOfWeek: [] as number[]
+    dayOfWeek: "",
+    startTime: "",
+    endTime: ""
   });
 
   const days = [
+    { label: "Dimanche", value: 0 },
     { label: "Lundi", value: 1 },
     { label: "Mardi", value: 2 },
     { label: "Mercredi", value: 3 },
     { label: "Jeudi", value: 4 },
     { label: "Vendredi", value: 5 },
-    { label: "Samedi", value: 6 },
-    { label: "Dimanche", value: 0 }
+    { label: "Samedi", value: 6 }
   ];
 
   useEffect(() => {
@@ -65,16 +62,21 @@ export const ScheduleManager = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [eventsData, songsData] = await Promise.all([
-        api.getSchedule(),
-        api.getSongs()
+      
+      const [{ data: eventsData, error: eventsError }, { data: songsData, error: songsError }] = await Promise.all([
+        supabase.from('scheduled_events').select('*').order('day_of_week'),
+        supabase.from('songs').select('*').order('created_at', { ascending: false })
       ]);
-      setEvents(eventsData as ScheduledEvent[]);
-      setSongs(songsData as Song[]);
-    } catch (error) {
+
+      if (eventsError) throw eventsError;
+      if (songsError) throw songsError;
+
+      setEvents(eventsData || []);
+      setSongs(songsData || []);
+    } catch (error: any) {
       toast({
         title: "Erreur",
-        description: "Impossible de charger les données",
+        description: error.message || "Impossible de charger les données",
         variant: "destructive"
       });
     } finally {
@@ -83,7 +85,7 @@ export const ScheduleManager = () => {
   };
 
   const handleAddEvent = async () => {
-    if (!newEvent.name || !newEvent.songId || !newEvent.time || newEvent.daysOfWeek.length === 0) {
+    if (!newEvent.dayOfWeek || !newEvent.startTime || !newEvent.endTime) {
       toast({
         title: "Erreur",
         description: "Veuillez remplir tous les champs",
@@ -93,25 +95,31 @@ export const ScheduleManager = () => {
     }
 
     try {
-      await api.createScheduledEvent({
-        name: newEvent.name,
-        songId: parseInt(newEvent.songId),
-        scheduledTime: newEvent.time,
-        daysOfWeek: newEvent.daysOfWeek
-      });
-      
+      const { data: { user } } = await supabase.auth.getUser();
+
+      const { error } = await supabase
+        .from('scheduled_events')
+        .insert([{
+          day_of_week: parseInt(newEvent.dayOfWeek),
+          start_time: newEvent.startTime,
+          end_time: newEvent.endTime,
+          created_by: user?.id
+        }]);
+
+      if (error) throw error;
+
       toast({
         title: "Succès",
         description: "Événement programmé ajouté"
       });
-      
+
       setIsDialogOpen(false);
-      setNewEvent({ name: "", songId: "", time: "", daysOfWeek: [] });
+      setNewEvent({ dayOfWeek: "", startTime: "", endTime: "" });
       loadData();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Erreur",
-        description: "Impossible d'ajouter l'événement",
+        description: error.message || "Impossible d'ajouter l'événement",
         variant: "destructive"
       });
     }
@@ -134,17 +142,41 @@ export const ScheduleManager = () => {
 
     try {
       setUploading(true);
-      await api.uploadAudio(uploadFile);
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      // Upload file to storage
+      const fileExt = uploadFile.name.split('.').pop();
+      const fileName = `${Math.random()}.${fileExt}`;
+      const filePath = `${user?.id}/${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('audio-files')
+        .upload(filePath, uploadFile);
+
+      if (uploadError) throw uploadError;
+
+      // Create song record
+      const { error: insertError } = await supabase
+        .from('songs')
+        .insert([{
+          title: uploadFile.name.replace(/\.[^/.]+$/, ""),
+          file_path: filePath,
+          file_size: uploadFile.size,
+          uploaded_by: user?.id
+        }]);
+
+      if (insertError) throw insertError;
+
       toast({
         title: "Succès",
         description: "Fichier audio importé avec succès",
       });
       setUploadFile(null);
       loadData();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Erreur",
-        description: "Impossible d'importer le fichier audio",
+        description: error.message || "Impossible d'importer le fichier audio",
         variant: "destructive",
       });
     } finally {
@@ -152,79 +184,58 @@ export const ScheduleManager = () => {
     }
   };
 
-  const handleDeleteSong = async (id: number) => {
+  const handleDeleteSong = async (id: string, filePath: string) => {
     try {
-      await api.deleteSong(id);
+      // Delete from storage
+      await supabase.storage.from('audio-files').remove([filePath]);
+
+      // Delete from database
+      const { error } = await supabase
+        .from('songs')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
       toast({
         title: "Succès",
         description: "Fichier audio supprimé",
       });
       loadData();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Erreur",
-        description: "Impossible de supprimer le fichier audio",
+        description: error.message || "Impossible de supprimer le fichier audio",
         variant: "destructive",
       });
     }
   };
 
-  const handleToggleActive = async (event: ScheduledEvent) => {
+  const handleDeleteEvent = async (id: string) => {
     try {
-      await api.updateScheduledEvent(event.id, {
-        name: event.name,
-        songId: event.song_id,
-        scheduledTime: event.scheduled_time,
-        daysOfWeek: event.days_of_week,
-        active: !event.active
-      });
-      
-      toast({
-        title: "Succès",
-        description: event.active ? "Événement désactivé" : "Événement activé"
-      });
-      
-      loadData();
-    } catch (error) {
-      toast({
-        title: "Erreur",
-        description: "Impossible de modifier l'événement",
-        variant: "destructive"
-      });
-    }
-  };
+      const { error } = await supabase
+        .from('scheduled_events')
+        .delete()
+        .eq('id', id);
 
-  const handleDeleteEvent = async (id: number) => {
-    try {
-      await api.deleteScheduledEvent(id);
+      if (error) throw error;
+
       toast({
         title: "Succès",
         description: "Événement supprimé"
       });
       loadData();
-    } catch (error) {
+    } catch (error: any) {
       toast({
         title: "Erreur",
-        description: "Impossible de supprimer l'événement",
+        description: error.message || "Impossible de supprimer l'événement",
         variant: "destructive"
       });
     }
   };
 
-  const toggleDay = (dayValue: number) => {
-    setNewEvent(prev => ({
-      ...prev,
-      daysOfWeek: prev.daysOfWeek.includes(dayValue)
-        ? prev.daysOfWeek.filter(d => d !== dayValue)
-        : [...prev.daysOfWeek, dayValue]
-    }));
-  };
-
-  const getDayLabels = (daysOfWeek: number[]) => {
-    return days
-      .filter(d => daysOfWeek.includes(d.value))
-      .map(d => d.label)
-      .join(", ");
+  const getDayLabel = (dayValue: number) => {
+    return days.find(d => d.value === dayValue)?.label || dayValue.toString();
   };
 
   return (
@@ -279,20 +290,14 @@ export const ScheduleManager = () => {
                           </p>
                         </div>
                       </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-xs text-muted-foreground flex items-center gap-1">
-                          <Clock className="h-3 w-3" />
-                          {Math.floor(song.duration / 60)}:{(song.duration % 60).toString().padStart(2, "0")}
-                        </span>
-                        <Button
-                          type="button"
-                          size="icon"
-                          variant="outline"
-                          onClick={() => handleDeleteSong(song.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <Button
+                        type="button"
+                        size="icon"
+                        variant="outline"
+                        onClick={() => handleDeleteSong(song.id, song.file_path)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   ))}
                 </div>
@@ -306,47 +311,37 @@ export const ScheduleManager = () => {
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Programmation Automatique</h2>
           <p className="text-muted-foreground">
-            Programmez des fichiers audio à lire automatiquement aux heures définies
+            Programmez des plages horaires pour votre diffusion
           </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
           <DialogTrigger asChild>
             <Button className="gap-2">
               <Plus className="h-4 w-4" />
-              Programmer un Fichier
+              Programmer un Créneau
             </Button>
           </DialogTrigger>
           <DialogContent className="max-w-md">
             <DialogHeader>
-              <DialogTitle>Programmer une Lecture Automatique</DialogTitle>
+              <DialogTitle>Programmer un Créneau</DialogTitle>
               <DialogDescription>
-                Le fichier interrompra la playlist en cours et reprendra après sa lecture
+                Définissez une plage horaire pour votre programmation
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 py-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Nom de la Programmation</Label>
-                <Input
-                  id="name"
-                  placeholder="Ex: Prédication du Dimanche"
-                  value={newEvent.name}
-                  onChange={(e) => setNewEvent({ ...newEvent, name: e.target.value })}
-                />
-              </div>
-              
-              <div className="space-y-2">
-                <Label htmlFor="song">Fichier Audio</Label>
+                <Label htmlFor="day">Jour de la Semaine</Label>
                 <Select
-                  value={newEvent.songId}
-                  onValueChange={(value) => setNewEvent({ ...newEvent, songId: value })}
+                  value={newEvent.dayOfWeek}
+                  onValueChange={(value) => setNewEvent({ ...newEvent, dayOfWeek: value })}
                 >
                   <SelectTrigger>
-                    <SelectValue placeholder="Sélectionnez un fichier" />
+                    <SelectValue placeholder="Sélectionnez un jour" />
                   </SelectTrigger>
                   <SelectContent>
-                    {songs.map(song => (
-                      <SelectItem key={song.id} value={song.id.toString()}>
-                        {song.title} - {song.artist}
+                    {days.map(day => (
+                      <SelectItem key={day.value} value={day.value.toString()}>
+                        {day.label}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -354,38 +349,27 @@ export const ScheduleManager = () => {
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="time">Heure de Lecture</Label>
+                <Label htmlFor="startTime">Heure de Début</Label>
                 <Input
-                  id="time"
+                  id="startTime"
                   type="time"
-                  value={newEvent.time}
-                  onChange={(e) => setNewEvent({ ...newEvent, time: e.target.value })}
+                  value={newEvent.startTime}
+                  onChange={(e) => setNewEvent({ ...newEvent, startTime: e.target.value })}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label>Jours de la Semaine</Label>
-                <div className="grid grid-cols-2 gap-2">
-                  {days.map(day => (
-                    <div key={day.value} className="flex items-center space-x-2">
-                      <Checkbox
-                        id={`day-${day.value}`}
-                        checked={newEvent.daysOfWeek.includes(day.value)}
-                        onCheckedChange={() => toggleDay(day.value)}
-                      />
-                      <label
-                        htmlFor={`day-${day.value}`}
-                        className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70"
-                      >
-                        {day.label}
-                      </label>
-                    </div>
-                  ))}
-                </div>
+                <Label htmlFor="endTime">Heure de Fin</Label>
+                <Input
+                  id="endTime"
+                  type="time"
+                  value={newEvent.endTime}
+                  onChange={(e) => setNewEvent({ ...newEvent, endTime: e.target.value })}
+                />
               </div>
 
               <Button onClick={handleAddEvent} className="w-full">
-                Programmer la Lecture
+                Programmer le Créneau
               </Button>
             </div>
           </DialogContent>
@@ -396,16 +380,16 @@ export const ScheduleManager = () => {
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5 text-accent" />
-            Fichiers Programmés
+            Créneaux Programmés
           </CardTitle>
           <CardDescription>
-            Ces fichiers seront lus automatiquement aux heures définies
+            Ces créneaux définissent votre grille de programmation hebdomadaire
           </CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
             <div className="text-center py-8 text-muted-foreground">
-              Chargement...
+              <Loader2 className="h-8 w-8 animate-spin mx-auto" />
             </div>
           ) : events.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
@@ -416,51 +400,28 @@ export const ScheduleManager = () => {
               {events.map((event) => (
                 <Card 
                   key={event.id} 
-                  className={`transition-smooth hover:shadow-divine hover:border-accent/30 ${
-                    !event.active ? 'opacity-50' : ''
-                  }`}
+                  className="transition-smooth hover:shadow-divine hover:border-accent/30"
                 >
                   <CardContent className="p-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-4">
                         <div className="h-12 w-12 rounded-lg bg-accent/10 flex items-center justify-center">
-                          <Music className="h-5 w-5 text-accent" />
+                          <Clock className="h-5 w-5 text-accent" />
                         </div>
                         <div>
-                          <p className="font-semibold">{event.name}</p>
+                          <p className="font-semibold">{getDayLabel(event.day_of_week)}</p>
                           <p className="text-sm text-muted-foreground">
-                            {event.song_title} - {event.artist}
+                            {event.start_time} - {event.end_time}
                           </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <Badge variant="outline" className="text-xs">
-                              {getDayLabels(event.days_of_week)}
-                            </Badge>
-                            <span className="text-sm text-muted-foreground">
-                              à {event.scheduled_time}
-                            </span>
-                          </div>
                         </div>
                       </div>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          onClick={() => handleToggleActive(event)}
-                        >
-                          {event.active ? (
-                            <Power className="h-4 w-4 text-green-500" />
-                          ) : (
-                            <PowerOff className="h-4 w-4 text-muted-foreground" />
-                          )}
-                        </Button>
-                        <Button
-                          size="icon"
-                          variant="outline"
-                          onClick={() => handleDeleteEvent(event.id)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
+                      <Button
+                        size="icon"
+                        variant="outline"
+                        onClick={() => handleDeleteEvent(event.id)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
                     </div>
                   </CardContent>
                 </Card>
