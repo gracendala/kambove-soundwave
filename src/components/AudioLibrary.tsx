@@ -401,52 +401,60 @@ export const AudioLibrary = () => {
             <p className="text-sm">Essayez un autre terme de recherche</p>
           </div>
         ) : (
-          <ScrollArea className="h-[500px] rounded-md border border-border/50">
-            <div className="divide-y divide-border/50">
-              {filteredSongs.map((song, index) => (
-                <div
-                  key={song.id}
-                  className="group flex items-center gap-3 px-4 py-3 hover:bg-muted/50 transition-colors animate-fade-in"
-                >
-                  <span className="text-sm text-muted-foreground w-8 flex-shrink-0">
-                    {index + 1}
-                  </span>
-                  <Music className="h-4 w-4 text-accent flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{song.title}</p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      {song.artist && <span>{song.artist}</span>}
-                      {song.duration && <span>• {formatDuration(song.duration)}</span>}
+          <ScrollArea className="h-[600px]">
+            <div className="border border-border/50 rounded-md overflow-hidden">
+              {/* Header */}
+              <div className="bg-muted/50 px-4 py-2 text-xs font-medium text-muted-foreground flex items-center gap-3 border-b border-border/50">
+                <span className="w-10">#</span>
+                <span className="flex-1">Titre</span>
+                <span className="w-20 hidden sm:block">Durée</span>
+                <span className="w-24">Actions</span>
+              </div>
+              
+              {/* Rows */}
+              <div className="divide-y divide-border/30">
+                {filteredSongs.map((song, index) => (
+                  <div
+                    key={song.id}
+                    className="group flex items-center gap-3 px-4 py-2.5 hover:bg-accent/5 transition-colors"
+                  >
+                    <span className="text-xs text-muted-foreground/70 w-10 flex-shrink-0">
+                      {index + 1}
+                    </span>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{song.title}</p>
+                      {song.artist && (
+                        <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
+                      )}
                     </div>
-                    <div className="mt-2">
-                      <AudioPlayer 
-                        filePath={song.file_path} 
-                        title={song.title}
-                      />
+                    {song.duration && (
+                      <span className="text-xs text-muted-foreground w-20 hidden sm:block flex-shrink-0">
+                        {formatDuration(song.duration)}
+                      </span>
+                    )}
+                    <div className="flex items-center gap-0.5 w-24 justify-end flex-shrink-0">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => openAddToPlaylistDialog(song.id)}
+                        title="Ajouter à une playlist"
+                        className="h-7 w-7 opacity-0 group-hover:opacity-100"
+                      >
+                        <ListPlus className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => handleDeleteSong(song.id, song.file_path)}
+                        title="Supprimer"
+                        className="h-7 w-7 text-destructive hover:text-destructive opacity-0 group-hover:opacity-100"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => openAddToPlaylistDialog(song.id)}
-                      title="Ajouter à une playlist"
-                      className="h-8 w-8"
-                    >
-                      <ListPlus className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      onClick={() => handleDeleteSong(song.id, song.file_path)}
-                      title="Supprimer"
-                      className="h-8 w-8 text-destructive hover:text-destructive"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
           </ScrollArea>
         )}
