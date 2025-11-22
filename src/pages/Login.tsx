@@ -1,37 +1,76 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Cross, Loader2, AlertCircle } from 'lucide-react';
-import { isDemoMode } from '@/lib/mockApi';
-import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Cross, Loader2 } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
 
 const Login = () => {
-  const [username, setUsername] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [username, setUsername] = useState('');
   const [loading, setLoading] = useState(false);
-  const { login } = useAuth();
+  const [isSignUp, setIsSignUp] = useState(false);
+  const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (isAuthenticated) {
+      navigate('/');
+    }
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      await login(username, password);
-      toast({
-        title: 'Connexion réussie',
-        description: 'Bienvenue sur Radio Kambove',
-      });
-      navigate('/');
+      if (isSignUp) {
+        // Handle signup
+        const redirectUrl = `${window.location.origin}/`;
+        
+        const { error } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            emailRedirectTo: redirectUrl,
+            data: {
+              username: username || email.split('@')[0]
+            }
+          }
+        });
+
+        if (error) throw error;
+
+        toast({
+          title: 'Compte créé !',
+          description: 'Vous pouvez maintenant vous connecter.',
+        });
+        setIsSignUp(false);
+      } else {
+        // Handle login
+        const { error } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+
+        if (error) throw error;
+
+        toast({
+          title: 'Connexion réussie',
+          description: 'Bienvenue sur Radio Kambove !',
+        });
+        navigate('/');
+      }
     } catch (error: any) {
       toast({
-        title: 'Erreur de connexion',
-        description: error.message,
+        title: isSignUp ? 'Erreur d\'inscription' : 'Erreur de connexion',
+        description: error.message || 'Une erreur est survenue',
         variant: 'destructive',
       });
     } finally {
@@ -53,28 +92,34 @@ const Login = () => {
             <Cross className="w-8 h-8 text-primary-foreground" />
           </div>
           <CardTitle className="text-3xl font-heading">Kambove Tabernacle</CardTitle>
-          <CardDescription className="text-base">Gestion de la webradio</CardDescription>
+          <CardDescription className="text-base">
+            {isSignUp ? 'Créez votre compte' : 'Gestion de la webradio'}
+          </CardDescription>
         </CardHeader>
 
         <CardContent>
-          {isDemoMode() && (
-            <Alert className="mb-4 bg-primary/10 border-primary/20">
-              <AlertCircle className="h-4 w-4 text-primary" />
-              <AlertDescription className="text-sm">
-                <strong>Mode Démo</strong> - Vous testez l'interface sans backend. 
-                Déployez sur votre serveur Ubuntu pour activer toutes les fonctionnalités.
-              </AlertDescription>
-            </Alert>
-          )}
-          
           <form onSubmit={handleSubmit} className="space-y-4">
+            {isSignUp && (
+              <div className="space-y-2">
+                <label className="text-sm font-medium">Nom d'utilisateur</label>
+                <Input
+                  type="text"
+                  value={username}
+                  onChange={(e) => setUsername(e.target.value)}
+                  placeholder="Votre nom d'utilisateur"
+                  disabled={loading}
+                  className="transition-all duration-300 focus:shadow-glow"
+                />
+              </div>
+            )}
+
             <div className="space-y-2">
-              <label className="text-sm font-medium">Nom d'utilisateur</label>
+              <label className="text-sm font-medium">Email</label>
               <Input
-                type="text"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                placeholder="admin"
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="admin@radiokambove.com"
                 required
                 disabled={loading}
                 className="transition-all duration-300 focus:shadow-glow"
@@ -102,16 +147,23 @@ const Login = () => {
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Connexion...
+                  {isSignUp ? 'Inscription...' : 'Connexion...'}
                 </>
               ) : (
-                'Se connecter'
+                isSignUp ? 'S\'inscrire' : 'Se connecter'
               )}
             </Button>
 
-            <p className="text-xs text-center text-muted-foreground mt-4">
-              Identifiants par défaut: admin / admin123
-            </p>
+            <div className="text-center mt-4">
+              <Button
+                type="button"
+                variant="link"
+                onClick={() => setIsSignUp(!isSignUp)}
+                className="text-sm"
+              >
+                {isSignUp ? 'Déjà un compte ? Se connecter' : 'Pas de compte ? S\'inscrire'}
+              </Button>
+            </div>
           </form>
         </CardContent>
       </Card>

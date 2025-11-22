@@ -54,7 +54,7 @@ function AppContent() {
               </div>
             </div>
             <div className="flex items-center gap-4">
-              <span className="text-sm text-muted-foreground">{user?.username}</span>
+              <span className="text-sm text-muted-foreground">{user?.email}</span>
               <Button variant="ghost" size="sm" onClick={logout} className="gap-2">
                 <LogOut className="h-4 w-4" />
                 Déconnexion
