@@ -97,12 +97,14 @@ const Login = () => {
             )}
 
             <div className="space-y-2">
-              <label className="text-sm font-medium">Email</label>
+              <label className="text-sm font-medium">
+                {isSignUp ? 'Email' : 'Identifiant'}
+              </label>
               <Input
-                type="email"
+                type={isSignUp ? 'email' : 'text'}
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@radiokambove.com"
+                placeholder={isSignUp ? 'admin@radiokambove.com' : 'admin'}
                 required
                 disabled={loading}
                 className="transition-all duration-300 focus:shadow-glow"
