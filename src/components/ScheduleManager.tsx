@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { Clock, Plus, Trash2, Music, Power, PowerOff, Upload, Loader2 } from "lucide-react";
+import { Clock, Plus, Trash2, Loader2 } from "lucide-react";
+import { AudioLibrary } from "./AudioLibrary";
+import { ScheduledBroadcasts } from "./ScheduledBroadcasts";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
@@ -11,15 +12,6 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
-
-interface Song {
-  id: string;
-  title: string;
-  artist?: string;
-  duration?: number;
-  file_path: string;
-  created_at: string;
-}
 
 interface ScheduledEvent {
   id: string;
@@ -32,11 +24,8 @@ interface ScheduledEvent {
 
 export const ScheduleManager = () => {
   const [events, setEvents] = useState<ScheduledEvent[]>([]);
-  const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
-  const [uploading, setUploading] = useState(false);
   const { toast } = useToast();
 
   const [newEvent, setNewEvent] = useState({
@@ -63,16 +52,15 @@ export const ScheduleManager = () => {
     try {
       setLoading(true);
       
-      const [{ data: eventsData, error: eventsError }, { data: songsData, error: songsError }] = await Promise.all([
-        supabase.from('scheduled_events').select('*').order('day_of_week'),
-        supabase.from('songs').select('*').order('created_at', { ascending: false })
-      ]);
+      const { data: eventsData, error: eventsError } = await supabase
+        .from('scheduled_events')
+        .select('*')
+        .eq('event_type', 'recurring')
+        .order('day_of_week');
 
       if (eventsError) throw eventsError;
-      if (songsError) throw songsError;
 
       setEvents(eventsData || []);
-      setSongs(songsData || []);
     } catch (error: any) {
       toast({
         title: "Erreur",
@@ -100,6 +88,7 @@ export const ScheduleManager = () => {
       const { error } = await supabase
         .from('scheduled_events')
         .insert([{
+          event_type: 'recurring',
           day_of_week: parseInt(newEvent.dayOfWeek),
           start_time: newEvent.startTime,
           end_time: newEvent.endTime,
@@ -121,92 +110,6 @@ export const ScheduleManager = () => {
         title: "Erreur",
         description: error.message || "Impossible d'ajouter l'événement",
         variant: "destructive"
-      });
-    }
-  };
-
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0] || null;
-    setUploadFile(file);
-  };
-
-  const handleUpload = async () => {
-    if (!uploadFile) {
-      toast({
-        title: "Erreur",
-        description: "Veuillez sélectionner un fichier audio",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    try {
-      setUploading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      // Upload file to storage
-      const fileExt = uploadFile.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `${user?.id}/${fileName}`;
-
-      const { error: uploadError } = await supabase.storage
-        .from('audio-files')
-        .upload(filePath, uploadFile);
-
-      if (uploadError) throw uploadError;
-
-      // Create song record
-      const { error: insertError } = await supabase
-        .from('songs')
-        .insert([{
-          title: uploadFile.name.replace(/\.[^/.]+$/, ""),
-          file_path: filePath,
-          file_size: uploadFile.size,
-          uploaded_by: user?.id
-        }]);
-
-      if (insertError) throw insertError;
-
-      toast({
-        title: "Succès",
-        description: "Fichier audio importé avec succès",
-      });
-      setUploadFile(null);
-      loadData();
-    } catch (error: any) {
-      toast({
-        title: "Erreur",
-        description: error.message || "Impossible d'importer le fichier audio",
-        variant: "destructive",
-      });
-    } finally {
-      setUploading(false);
-    }
-  };
-
-  const handleDeleteSong = async (id: string, filePath: string) => {
-    try {
-      // Delete from storage
-      await supabase.storage.from('audio-files').remove([filePath]);
-
-      // Delete from database
-      const { error } = await supabase
-        .from('songs')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-
-      toast({
-        title: "Succès",
-        description: "Fichier audio supprimé",
-      });
-      loadData();
-    } catch (error: any) {
-      toast({
-        title: "Erreur",
-        description: error.message || "Impossible de supprimer le fichier audio",
-        variant: "destructive",
       });
     }
   };
@@ -240,78 +143,15 @@ export const ScheduleManager = () => {
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <Card className="transition-smooth hover:shadow-divine hover:border-accent/30">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div>
-              <CardTitle>Bibliothèque audio</CardTitle>
-              <CardDescription>Importez vos fichiers audio pour les utiliser dans la programmation</CardDescription>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <Input
-              type="file"
-              accept="audio/*"
-              onChange={handleFileChange}
-              className="sm:w-auto"
-            />
-            <Button
-              type="button"
-              onClick={handleUpload}
-              disabled={!uploadFile || uploading}
-              className="sm:w-auto w-full gap-2"
-            >
-              {uploading && <Loader2 className="h-4 w-4 animate-spin" />}
-              <Upload className="h-4 w-4" />
-              Importer un fichier audio
-            </Button>
-          </div>
-          <div className="space-y-2">
-            {songs.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Aucun fichier audio importé pour le moment.
-              </p>
-            ) : (
-              <ScrollArea className="h-56 rounded-md border border-border/50 p-3">
-                <div className="space-y-2">
-                  {songs.map((song) => (
-                    <div
-                      key={song.id}
-                      className="flex items-center justify-between rounded-lg bg-card px-3 py-2 hover:bg-muted/50 transition-smooth"
-                    >
-                      <div className="flex items-center gap-3">
-                        <Music className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="text-sm font-medium">{song.title}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {song.artist || "Artiste inconnu"}
-                          </p>
-                        </div>
-                      </div>
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="outline"
-                        onClick={() => handleDeleteSong(song.id, song.file_path)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
-              </ScrollArea>
-            )}
-          </div>
-        </CardContent>
-      </Card>
+      <AudioLibrary />
+      
+      <ScheduledBroadcasts />
 
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">Programmation Automatique</h2>
+          <h2 className="text-3xl font-bold tracking-tight">Programmation Hebdomadaire</h2>
           <p className="text-muted-foreground">
-            Programmez des plages horaires pour votre diffusion
+            Programmez des plages horaires récurrentes pour votre grille
           </p>
         </div>
         <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
