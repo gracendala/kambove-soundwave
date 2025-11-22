@@ -2,11 +2,12 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Music, Upload, Trash2, Loader2, ListPlus } from "lucide-react";
+import { Music, Upload, Trash2, Loader2, ListPlus, Search, SortAsc, SortDesc } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
 import { AudioPlayer } from "./AudioPlayer";
@@ -28,6 +29,7 @@ interface Playlist {
 
 export const AudioLibrary = () => {
   const [songs, setSongs] = useState<Song[]>([]);
+  const [filteredSongs, setFilteredSongs] = useState<Song[]>([]);
   const [playlists, setPlaylists] = useState<Playlist[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -35,7 +37,52 @@ export const AudioLibrary = () => {
   const [selectedSongForPlaylist, setSelectedSongForPlaylist] = useState<string>("");
   const [selectedPlaylist, setSelectedPlaylist] = useState<string>("");
   const [isAddToPlaylistOpen, setIsAddToPlaylistOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<"name" | "date" | "artist">("date");
+  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const { toast } = useToast();
+
+  useEffect(() => {
+    filterAndSortSongs();
+  }, [songs, searchQuery, sortBy, sortOrder]);
+
+  const filterAndSortSongs = () => {
+    let filtered = [...songs];
+
+    // Filter by search query
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(song => 
+        song.title.toLowerCase().includes(query) ||
+        (song.artist && song.artist.toLowerCase().includes(query))
+      );
+    }
+
+    // Sort
+    filtered.sort((a, b) => {
+      let comparison = 0;
+      
+      switch (sortBy) {
+        case "name":
+          comparison = a.title.localeCompare(b.title);
+          break;
+        case "artist":
+          comparison = (a.artist || "").localeCompare(b.artist || "");
+          break;
+        case "date":
+          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          break;
+      }
+
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+
+    setFilteredSongs(filtered);
+  };
+
+  const toggleSortOrder = () => {
+    setSortOrder(prev => prev === "asc" ? "desc" : "asc");
+  };
 
   useEffect(() => {
     loadSongs();
@@ -238,87 +285,156 @@ export const AudioLibrary = () => {
   return (
     <Card className="transition-smooth hover:shadow-divine hover:border-accent/30">
       <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <Music className="h-5 w-5 text-accent" />
-          Bibliothèque Audio
-        </CardTitle>
-        <CardDescription>
-          Gérez vos fichiers audio pour la programmation et les diffusions
-        </CardDescription>
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <Music className="h-5 w-5 text-accent" />
+              Bibliothèque Audio
+            </CardTitle>
+            <CardDescription>
+              {songs.length} fichier{songs.length !== 1 ? "s" : ""} audio
+            </CardDescription>
+          </div>
+          <Badge variant="outline" className="text-lg">
+            {filteredSongs.length}
+          </Badge>
+        </div>
       </CardHeader>
       <CardContent className="space-y-4">
+        {/* Upload Section */}
+        <Card className="bg-muted/30">
+          <CardContent className="p-4">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <Input
+                type="file"
+                accept="audio/*"
+                onChange={handleFileChange}
+                className="sm:flex-1"
+              />
+              <Button
+                onClick={handleUpload}
+                disabled={!uploadFile || uploading}
+                className="gap-2"
+              >
+                {uploading && <Loader2 className="h-4 w-4 animate-spin" />}
+                <Upload className="h-4 w-4" />
+                Importer
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Search and Sort Controls */}
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-          <Input
-            type="file"
-            accept="audio/*"
-            onChange={handleFileChange}
-            className="sm:flex-1"
-          />
-          <Button
-            onClick={handleUpload}
-            disabled={!uploadFile || uploading}
-            className="gap-2"
-          >
-            {uploading && <Loader2 className="h-4 w-4 animate-spin" />}
-            <Upload className="h-4 w-4" />
-            Importer
-          </Button>
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Rechercher par titre ou artiste..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <div className="flex gap-2">
+            <Select value={sortBy} onValueChange={(value: any) => setSortBy(value)}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="date">Date</SelectItem>
+                <SelectItem value="name">Titre</SelectItem>
+                <SelectItem value="artist">Artiste</SelectItem>
+              </SelectContent>
+            </Select>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={toggleSortOrder}
+              title={sortOrder === "asc" ? "Ordre croissant" : "Ordre décroissant"}
+            >
+              {sortOrder === "asc" ? (
+                <SortAsc className="h-4 w-4" />
+              ) : (
+                <SortDesc className="h-4 w-4" />
+              )}
+            </Button>
+          </div>
         </div>
 
+        {/* Results Info */}
+        {searchQuery && (
+          <div className="text-sm text-muted-foreground">
+            {filteredSongs.length} résultat{filteredSongs.length !== 1 ? "s" : ""} pour "{searchQuery}"
+          </div>
+        )}
+
+        {/* Songs List */}
         {songs.length === 0 ? (
-          <div className="text-center py-8 text-muted-foreground">
+          <div className="text-center py-12 text-muted-foreground">
             <Music className="h-12 w-12 mx-auto mb-3 opacity-20" />
             <p>Aucun fichier audio pour le moment</p>
             <p className="text-sm">Importez vos prédications et musiques</p>
           </div>
+        ) : filteredSongs.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            <Search className="h-12 w-12 mx-auto mb-3 opacity-20" />
+            <p>Aucun résultat trouvé</p>
+            <p className="text-sm">Essayez un autre terme de recherche</p>
+          </div>
         ) : (
-          <ScrollArea className="h-[400px] rounded-md border border-border/50 p-3">
+          <ScrollArea className="h-[500px] rounded-md border border-border/50 p-3">
             <div className="space-y-3">
-              {songs.map((song) => (
-                <div
+              {filteredSongs.map((song) => (
+                <Card
                   key={song.id}
-                  className="rounded-lg bg-card border border-border/30 overflow-hidden"
+                  className="overflow-hidden transition-smooth hover:shadow-divine hover:border-accent/30 animate-fade-in"
                 >
-                  <div className="flex items-center justify-between px-3 py-3">
+                  <div className="flex items-center justify-between px-3 py-2 bg-muted/20">
                     <div className="flex items-center gap-3 flex-1 min-w-0">
                       <div className="h-10 w-10 rounded-lg bg-accent/10 flex items-center justify-center flex-shrink-0">
                         <Music className="h-5 w-5 text-accent" />
                       </div>
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{song.title}</p>
-                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                          <span>{song.artist || "Artiste inconnu"}</span>
+                        <div className="flex items-center gap-2 flex-wrap text-xs text-muted-foreground">
+                          {song.artist && (
+                            <Badge variant="secondary" className="text-xs">
+                              {song.artist}
+                            </Badge>
+                          )}
                           {song.duration && <span>{formatDuration(song.duration)}</span>}
-                          <span>{formatFileSize(song.file_size)}</span>
+                          <span className="text-muted-foreground/60">{formatFileSize(song.file_size)}</span>
                         </div>
                       </div>
                     </div>
-                    <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="flex items-center gap-1 flex-shrink-0">
                       <Button
                         size="icon"
-                        variant="outline"
+                        variant="ghost"
                         onClick={() => openAddToPlaylistDialog(song.id)}
                         title="Ajouter à une playlist"
+                        className="h-8 w-8"
                       >
                         <ListPlus className="h-4 w-4" />
                       </Button>
                       <Button
                         size="icon"
-                        variant="outline"
+                        variant="ghost"
                         onClick={() => handleDeleteSong(song.id, song.file_path)}
                         title="Supprimer"
+                        className="h-8 w-8 text-destructive hover:text-destructive"
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
                     </div>
                   </div>
-                  <div className="px-3 pb-3">
+                  <CardContent className="p-3 pt-2">
                     <AudioPlayer 
                       filePath={song.file_path} 
                       title={song.title}
                     />
-                  </div>
-                </div>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           </ScrollArea>
