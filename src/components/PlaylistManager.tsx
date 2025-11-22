@@ -28,16 +28,6 @@ export const PlaylistManager = () => {
   const [selectedPlaylistName, setSelectedPlaylistName] = useState("");
   const { toast } = useToast();
 
-  if (selectedPlaylistId) {
-    return (
-      <PlaylistDetail
-        playlistId={selectedPlaylistId}
-        playlistName={selectedPlaylistName}
-        onBack={() => setSelectedPlaylistId(null)}
-      />
-    );
-  }
-
   useEffect(() => {
     loadPlaylists();
   }, []);
@@ -127,6 +117,17 @@ export const PlaylistManager = () => {
       });
     }
   };
+
+  // Conditional rendering AFTER all hooks
+  if (selectedPlaylistId) {
+    return (
+      <PlaylistDetail
+        playlistId={selectedPlaylistId}
+        playlistName={selectedPlaylistName}
+        onBack={() => setSelectedPlaylistId(null)}
+      />
+    );
+  }
 
   if (loading) {
     return (
