@@ -3,55 +3,231 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Badge } from "@/components/ui/badge";
-import { Radio, Settings, Upload, Link as LinkIcon, CheckCircle2 } from "lucide-react";
-import { useState } from "react";
+import { Radio, Link as LinkIcon, Settings, Save, ArrowRight, ArrowLeft } from "lucide-react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { z } from "zod";
+
+const streamSettingsSchema = z.object({
+  zeno_stream_url: z.string().max(500),
+  zeno_stream_key: z.string().max(200),
+  butt_port: z.string().regex(/^\d+$/, "Port invalide").max(5),
+  butt_password: z.string().max(100),
+  butt_mount_point: z.string().max(100),
+  audio_bitrate: z.string().regex(/^\d+$/, "Bitrate invalide").max(5),
+  audio_samplerate: z.string().regex(/^\d+$/, "Sample rate invalide").max(10)
+});
 
 export const StreamSettings = () => {
   const { toast } = useToast();
-  const [zenoConnected, setZenoConnected] = useState(true);
-  const [buttConnected, setButtConnected] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [metadataEnabled, setMetadataEnabled] = useState(true);
+  const [settings, setSettings] = useState({
+    zeno_stream_url: '',
+    zeno_stream_key: '',
+    butt_port: '8000',
+    butt_password: '',
+    butt_mount_point: '/live',
+    audio_bitrate: '128',
+    audio_samplerate: '44100'
+  });
 
-  const handleSaveSettings = () => {
-    toast({
-      title: "Paramètres sauvegardés",
-      description: "Vos configurations de streaming ont été mises à jour.",
-    });
+  useEffect(() => {
+    loadSettings();
+  }, []);
+
+  const loadSettings = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('radio_settings')
+        .select('setting_key, setting_value')
+        .in('setting_key', Object.keys(settings).concat(['zeno_metadata_enabled']));
+
+      if (error) throw error;
+
+      const settingsMap: any = {};
+      data?.forEach(item => {
+        settingsMap[item.setting_key] = item.setting_value || '';
+      });
+
+      setSettings({
+        zeno_stream_url: settingsMap.zeno_stream_url || '',
+        zeno_stream_key: settingsMap.zeno_stream_key || '',
+        butt_port: settingsMap.butt_port || '8000',
+        butt_password: settingsMap.butt_password || '',
+        butt_mount_point: settingsMap.butt_mount_point || '/live',
+        audio_bitrate: settingsMap.audio_bitrate || '128',
+        audio_samplerate: settingsMap.audio_samplerate || '44100'
+      });
+
+      setMetadataEnabled(settingsMap.zeno_metadata_enabled === 'true');
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.message || "Impossible de charger les paramètres"
+      });
+    }
+  };
+
+  const handleSaveSettings = async () => {
+    try {
+      setLoading(true);
+      
+      // Validation
+      streamSettingsSchema.parse(settings);
+
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Mise à jour de tous les paramètres
+      const allSettings = {
+        ...settings,
+        zeno_metadata_enabled: metadataEnabled.toString()
+      };
+
+      for (const [key, value] of Object.entries(allSettings)) {
+        const { error } = await supabase
+          .from('radio_settings')
+          .update({
+            setting_value: value,
+            updated_by: user?.id
+          })
+          .eq('setting_key', key);
+
+        if (error) throw error;
+      }
+
+      toast({
+        title: "Paramètres sauvegardés",
+        description: "Vos configurations de streaming ont été mises à jour."
+      });
+    } catch (error: any) {
+      if (error instanceof z.ZodError) {
+        toast({
+          variant: "destructive",
+          title: "Erreur de validation",
+          description: error.errors[0].message
+        });
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Erreur",
+          description: error.message || "Impossible de sauvegarder"
+        });
+      }
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6">
       <div>
-        <h2 className="text-3xl font-bold tracking-tight">Configuration du Streaming</h2>
-        <p className="text-muted-foreground">Gérez vos connexions et paramètres de diffusion</p>
+        <h3 className="text-2xl font-bold">Configuration du Streaming</h3>
+        <p className="text-muted-foreground">Gérez vos flux d'entrée (BUTT) et de sortie (Zeno.fm)</p>
       </div>
 
-      {/* Zeno.fm Configuration */}
+      {/* Architecture Diagram */}
+      <Card className="bg-accent/5 border-accent/20">
+        <CardContent className="p-6">
+          <div className="flex items-center justify-center gap-4 text-sm">
+            <div className="flex flex-col items-center gap-2">
+              <div className="p-3 bg-primary/10 rounded-lg">
+                <LinkIcon className="h-6 w-6 text-primary" />
+              </div>
+              <span className="font-semibold">BUTT (Direct)</span>
+            </div>
+            <ArrowRight className="h-5 w-5 text-accent" />
+            <div className="flex flex-col items-center gap-2">
+              <div className="p-3 bg-accent/10 rounded-lg">
+                <Radio className="h-6 w-6 text-accent" />
+              </div>
+              <span className="font-semibold">Votre Serveur</span>
+            </div>
+            <ArrowRight className="h-5 w-5 text-accent" />
+            <div className="flex flex-col items-center gap-2">
+              <div className="p-3 bg-green-500/10 rounded-lg">
+                <Radio className="h-6 w-6 text-green-500" />
+              </div>
+              <span className="font-semibold">Zeno.fm</span>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* BUTT Input Configuration */}
+      <Card className="transition-smooth hover:shadow-divine hover:border-accent/30">
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <ArrowLeft className="h-5 w-5 text-accent" />
+            <CardTitle>Réception BUTT (Entrée)</CardTitle>
+          </div>
+          <CardDescription>
+            BUTT envoie son flux vers votre serveur pour les directs
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="butt-port">Port d'Écoute</Label>
+            <Input
+              id="butt-port"
+              type="number"
+              value={settings.butt_port}
+              onChange={(e) => setSettings({ ...settings, butt_port: e.target.value })}
+              placeholder="8000"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="butt-password">Mot de Passe Source</Label>
+            <Input
+              id="butt-password"
+              type="password"
+              value={settings.butt_password}
+              onChange={(e) => setSettings({ ...settings, butt_password: e.target.value })}
+              placeholder="Mot de passe pour BUTT"
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="butt-mount">Point de Montage</Label>
+            <Input
+              id="butt-mount"
+              value={settings.butt_mount_point}
+              onChange={(e) => setSettings({ ...settings, butt_mount_point: e.target.value })}
+              placeholder="/live"
+            />
+          </div>
+          <div className="p-4 bg-muted/50 rounded-lg border border-border/50">
+            <p className="text-sm text-muted-foreground mb-2">
+              <strong>Configuration BUTT:</strong>
+            </p>
+            <code className="text-xs bg-card p-2 rounded block">
+              Serveur: votre-serveur.com<br/>
+              Port: {settings.butt_port}<br/>
+              Mot de passe: [voir ci-dessus]<br/>
+              Point de montage: {settings.butt_mount_point}
+            </code>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Zeno.fm Output Configuration */}
       <Card className="gradient-divine border-accent/20">
         <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Radio className="h-5 w-5 text-accent" />
-              <CardTitle>Connexion Zeno.fm</CardTitle>
-            </div>
-            {zenoConnected && (
-              <Badge className="bg-green-500 text-white gap-1">
-                <CheckCircle2 className="h-3 w-3" />
-                Connecté
-              </Badge>
-            )}
+          <div className="flex items-center gap-2">
+            <ArrowRight className="h-5 w-5 text-accent" />
+            <CardTitle>Connexion Zeno.fm (Sortie)</CardTitle>
           </div>
-          <CardDescription>Configurez votre sortie de streaming vers Zeno.fm</CardDescription>
+          <CardDescription>Votre serveur diffuse vers Zeno.fm pour les auditeurs</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="zeno-url">URL de Streaming Zeno.fm</Label>
             <Input
               id="zeno-url"
+              value={settings.zeno_stream_url}
+              onChange={(e) => setSettings({ ...settings, zeno_stream_url: e.target.value })}
               placeholder="rtmp://stream.zeno.fm/your-key"
-              defaultValue="rtmp://stream.zeno.fm/kambove-tabernacle"
             />
           </div>
           <div className="space-y-2">
@@ -59,8 +235,9 @@ export const StreamSettings = () => {
             <Input
               id="zeno-key"
               type="password"
+              value={settings.zeno_stream_key}
+              onChange={(e) => setSettings({ ...settings, zeno_stream_key: e.target.value })}
               placeholder="Votre clé de streaming"
-              defaultValue="••••••••••••••"
             />
           </div>
           <div className="flex items-center justify-between p-4 bg-card rounded-lg border border-border/50">
@@ -74,60 +251,6 @@ export const StreamSettings = () => {
               checked={metadataEnabled}
               onCheckedChange={setMetadataEnabled}
             />
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* BUTT Configuration */}
-      <Card className="transition-smooth hover:shadow-divine hover:border-accent/30">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <LinkIcon className="h-5 w-5 text-accent" />
-              <CardTitle>Réception BUTT (Direct)</CardTitle>
-            </div>
-            {buttConnected ? (
-              <Badge className="bg-green-500 text-white gap-1">
-                <CheckCircle2 className="h-3 w-3" />
-                Connecté
-              </Badge>
-            ) : (
-              <Badge variant="outline">Déconnecté</Badge>
-            )}
-          </div>
-          <CardDescription>
-            Configurez la réception de flux BUTT pour vos directs de prédication
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="butt-port">Port d'Écoute</Label>
-            <Input
-              id="butt-port"
-              type="number"
-              placeholder="8000"
-              defaultValue="8000"
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="butt-password">Mot de Passe Source</Label>
-            <Input
-              id="butt-password"
-              type="password"
-              placeholder="Mot de passe pour BUTT"
-              defaultValue="••••••••"
-            />
-          </div>
-          <div className="p-4 bg-muted/50 rounded-lg border border-border/50">
-            <p className="text-sm text-muted-foreground mb-2">
-              <strong>Configuration BUTT:</strong>
-            </p>
-            <code className="text-xs bg-card p-2 rounded block">
-              Serveur: votre-serveur.com<br/>
-              Port: 8000<br/>
-              Mot de passe: [voir ci-dessus]<br/>
-              Point de montage: /live
-            </code>
           </div>
         </CardContent>
       </Card>
@@ -147,8 +270,9 @@ export const StreamSettings = () => {
             <Input
               id="bitrate"
               type="number"
+              value={settings.audio_bitrate}
+              onChange={(e) => setSettings({ ...settings, audio_bitrate: e.target.value })}
               placeholder="128"
-              defaultValue="128"
             />
           </div>
           <div className="space-y-2">
@@ -156,15 +280,16 @@ export const StreamSettings = () => {
             <Input
               id="samplerate"
               type="number"
+              value={settings.audio_samplerate}
+              onChange={(e) => setSettings({ ...settings, audio_samplerate: e.target.value })}
               placeholder="44100"
-              defaultValue="44100"
             />
           </div>
         </CardContent>
       </Card>
 
-      <Button onClick={handleSaveSettings} className="w-full sm:w-auto" size="lg">
-        <Upload className="h-4 w-4 mr-2" />
+      <Button onClick={handleSaveSettings} disabled={loading} className="w-full sm:w-auto gap-2" size="lg">
+        <Save className="h-4 w-4" />
         Sauvegarder les Paramètres
       </Button>
     </div>
