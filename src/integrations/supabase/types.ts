@@ -133,6 +133,30 @@ export type Database = {
         }
         Relationships: []
       }
+      radio_settings: {
+        Row: {
+          id: string
+          setting_key: string
+          setting_value: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          id?: string
+          setting_key: string
+          setting_value?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          id?: string
+          setting_key?: string
+          setting_value?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
       scheduled_events: {
         Row: {
           created_at: string
