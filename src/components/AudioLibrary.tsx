@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Pagination, PaginationContent, PaginationItem, PaginationLink, PaginationNext, PaginationPrevious, PaginationEllipsis } from "@/components/ui/pagination";
-import { supabase } from "@/lib/supabase";
+import { songsAPI, playlistsAPI } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 import { AudioPlayer } from "./AudioPlayer";
 
@@ -96,19 +96,10 @@ export const AudioLibrary = () => {
   const loadSongs = async () => {
     try {
       setLoading(true);
-      const [{ data: songsData, error: songsError }, { data: playlistsData, error: playlistsError }] = await Promise.all([
-        supabase
-          .from('songs')
-          .select('*')
-          .order('created_at', { ascending: false }),
-        supabase
-          .from('playlists')
-          .select('id, name')
-          .order('name')
+      const [songsData, playlistsData] = await Promise.all([
+        songsAPI.getAll(),
+        playlistsAPI.getAll()
       ]);
-
-      if (songsError) throw songsError;
-      if (playlistsError) throw playlistsError;
 
       setSongs(songsData || []);
       setPlaylists(playlistsData || []);
@@ -140,28 +131,10 @@ export const AudioLibrary = () => {
 
     try {
       setUploading(true);
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      const fileExt = uploadFile.name.split('.').pop();
-      const fileName = `${Math.random()}.${fileExt}`;
-      const filePath = `${user?.id}/${fileName}`;
+      const formData = new FormData();
+      formData.append('audio', uploadFile);
 
-      const { error: uploadError } = await supabase.storage
-        .from('audio-files')
-        .upload(filePath, uploadFile);
-
-      if (uploadError) throw uploadError;
-
-      const { error: insertError } = await supabase
-        .from('songs')
-        .insert([{
-          title: uploadFile.name.replace(/\.[^/.]+$/, ""),
-          file_path: filePath,
-          file_size: uploadFile.size,
-          uploaded_by: user?.id
-        }]);
-
-      if (insertError) throw insertError;
+      await songsAPI.upload(formData);
 
       toast({
         title: "Succès",
@@ -184,14 +157,7 @@ export const AudioLibrary = () => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer ce fichier audio ?")) return;
 
     try {
-      await supabase.storage.from('audio-files').remove([filePath]);
-
-      const { error } = await supabase
-        .from('songs')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await songsAPI.delete(id);
 
       toast({
         title: "Succès",
@@ -231,48 +197,13 @@ export const AudioLibrary = () => {
     }
 
     try {
-      // Check if song already exists in playlist
-      const { data: existingEntry, error: checkError } = await supabase
-        .from('playlist_songs')
-        .select('id')
-        .eq('playlist_id', selectedPlaylist)
-        .eq('song_id', selectedSongForPlaylist)
-        .maybeSingle();
-
-      if (checkError) throw checkError;
-
-      if (existingEntry) {
-        toast({
-          variant: "destructive",
-          title: "Erreur",
-          description: "Cette chanson est déjà dans la playlist"
-        });
-        return;
-      }
-
-      // Get the current max position in the playlist
-      const { data: existingSongs, error: fetchError } = await supabase
-        .from('playlist_songs')
-        .select('position')
-        .eq('playlist_id', selectedPlaylist)
-        .order('position', { ascending: false })
-        .limit(1);
-
-      if (fetchError) throw fetchError;
-
-      const nextPosition = existingSongs && existingSongs.length > 0 
-        ? existingSongs[0].position + 1 
+      // Get songs in playlist to calculate next position
+      const playlistSongs = await playlistsAPI.getSongs(selectedPlaylist);
+      const nextPosition = playlistSongs && playlistSongs.length > 0
+        ? Math.max(...playlistSongs.map((s: any) => s.position)) + 1
         : 0;
 
-      const { error } = await supabase
-        .from('playlist_songs')
-        .insert([{
-          playlist_id: selectedPlaylist,
-          song_id: selectedSongForPlaylist,
-          position: nextPosition
-        }]);
-
-      if (error) throw error;
+      await playlistsAPI.addSong(selectedPlaylist, selectedSongForPlaylist, nextPosition);
 
       toast({
         title: "Succès",

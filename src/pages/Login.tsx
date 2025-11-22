@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { Cross, Loader2 } from 'lucide-react';
-import { supabase } from '@/lib/supabase';
+import { authAPI } from '@/services/api';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -32,34 +32,17 @@ const Login = () => {
     try {
       if (isSignUp) {
         // Handle signup
-        const redirectUrl = `${window.location.origin}/`;
-        
-        const { error } = await supabase.auth.signUp({
-          email,
-          password,
-          options: {
-            emailRedirectTo: redirectUrl,
-            data: {
-              username: username || email.split('@')[0]
-            }
-          }
-        });
-
-        if (error) throw error;
+        await authAPI.register(email, password, username);
 
         toast({
           title: 'Compte créé !',
           description: 'Vous pouvez maintenant vous connecter.',
         });
         setIsSignUp(false);
+        setPassword(''); // Clear password after signup
       } else {
         // Handle login
-        const { error } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (error) throw error;
+        await authAPI.login(email, password);
 
         toast({
           title: 'Connexion réussie',

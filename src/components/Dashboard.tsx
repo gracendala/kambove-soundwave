@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Radio, Music, Calendar, Users, Play, Pause, Volume2, BarChart3, Activity, TrendingUp, Loader2 } from "lucide-react";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { playlistsAPI, songsAPI, scheduleAPI, statsAPI } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 
 interface DashboardStats {
@@ -48,96 +48,36 @@ export const Dashboard = () => {
     try {
       setLoading(true);
 
-      // Get total playlists
-      const { count: playlistCount } = await supabase
-        .from('playlists')
-        .select('*', { count: 'exact', head: true });
-
-      // Get total songs
-      const { count: songCount } = await supabase
-        .from('songs')
-        .select('*', { count: 'exact', head: true });
-
-      // Get upcoming events (next 7 days)
-      const today = new Date().toISOString().split('T')[0];
-      const { count: eventCount } = await supabase
-        .from('scheduled_events')
-        .select('*', { count: 'exact', head: true })
-        .or(`scheduled_date.gte.${today},event_type.eq.recurring`);
-
-      // Get current listeners (latest from play_stats)
-      const { data: latestStats } = await supabase
-        .from('play_stats')
-        .select('listener_count')
-        .order('played_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
-
-      // Get stats for today, this week, this month
-      const now = new Date();
-      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
-      const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString();
-      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-
-      const [
-        { count: playsToday },
-        { count: playsThisWeek },
-        { count: playsThisMonth }
-      ] = await Promise.all([
-        supabase.from('play_stats').select('*', { count: 'exact', head: true }).gte('played_at', todayStart),
-        supabase.from('play_stats').select('*', { count: 'exact', head: true }).gte('played_at', weekStart),
-        supabase.from('play_stats').select('*', { count: 'exact', head: true }).gte('played_at', monthStart)
+      // Get data from backend API
+      const [playlistsData, songsData, eventsData, statsData] = await Promise.all([
+        playlistsAPI.getAll(),
+        songsAPI.getAll(),
+        scheduleAPI.getAll(),
+        statsAPI.getCurrent().catch(() => ({ listeners: 0, currentSong: null }))
       ]);
 
-      // Get stream quality from settings
-      const { data: qualityData } = await supabase
-        .from('radio_settings')
-        .select('setting_value')
-        .eq('setting_key', 'stream_quality')
-        .maybeSingle();
-
-      // Get top songs by play count
-      const { data: topSongsData } = await supabase
-        .from('play_stats')
-        .select(`
-          song_id,
-          songs (
-            id,
-            title,
-            artist
-          )
-        `)
-        .not('song_id', 'is', null)
-        .order('played_at', { ascending: false })
-        .limit(100);
-
-      // Count plays per song
-      const songPlayCounts = new Map<string, { title: string; artist: string; count: number }>();
-      topSongsData?.forEach((stat: any) => {
-        if (stat.songs) {
-          const song = stat.songs;
-          const existing = songPlayCounts.get(song.id) || { title: song.title, artist: song.artist || 'Artiste inconnu', count: 0 };
-          songPlayCounts.set(song.id, { ...existing, count: existing.count + 1 });
-        }
+      // Calculate upcoming events
+      const today = new Date();
+      const upcomingEvents = eventsData.filter((event: any) => {
+        if (event.event_type === 'recurring') return true;
+        const eventDate = new Date(event.scheduled_date);
+        return eventDate >= today;
       });
 
-      const topSongs = Array.from(songPlayCounts.entries())
-        .map(([id, data]) => ({ id, ...data, playCount: data.count }))
-        .sort((a, b) => b.playCount - a.playCount)
-        .slice(0, 3);
-
+      // Mock stats for now (can be enhanced with real backend stats)
       setStats({
-        totalPlaylists: playlistCount || 0,
-        totalSongs: songCount || 0,
-        upcomingEvents: eventCount || 0,
-        currentListeners: latestStats?.listener_count || 0,
-        topSongs,
-        playsToday: playsToday || 0,
-        playsThisWeek: playsThisWeek || 0,
-        playsThisMonth: playsThisMonth || 0,
-        streamQuality: qualityData?.setting_value || '128kbps'
+        totalPlaylists: playlistsData.length || 0,
+        totalSongs: songsData.length || 0,
+        upcomingEvents: upcomingEvents.length || 0,
+        currentListeners: statsData.listeners || 0,
+        topSongs: [],
+        playsToday: 0,
+        playsThisWeek: 0,
+        playsThisMonth: 0,
+        streamQuality: '128kbps'
       });
     } catch (error: any) {
+      console.error('Dashboard load error:', error);
       toast({
         variant: "destructive",
         title: "Erreur",

@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { supabase } from "@/lib/supabase";
+import { scheduleAPI } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 
 interface ScheduledEvent {
@@ -51,15 +51,10 @@ export const ScheduleManager = () => {
     try {
       setLoading(true);
       
-      const { data: eventsData, error: eventsError } = await supabase
-        .from('scheduled_events')
-        .select('*')
-        .eq('event_type', 'recurring')
-        .order('day_of_week');
-
-      if (eventsError) throw eventsError;
-
-      setEvents(eventsData || []);
+      const eventsData = await scheduleAPI.getAll();
+      // Filter recurring events
+      const recurringEvents = eventsData.filter((e: any) => e.event_type === 'recurring');
+      setEvents(recurringEvents || []);
     } catch (error: any) {
       toast({
         title: "Erreur",
@@ -82,19 +77,12 @@ export const ScheduleManager = () => {
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-
-      const { error } = await supabase
-        .from('scheduled_events')
-        .insert([{
-          event_type: 'recurring',
-          day_of_week: parseInt(newEvent.dayOfWeek),
-          start_time: newEvent.startTime,
-          end_time: newEvent.endTime,
-          created_by: user?.id
-        }]);
-
-      if (error) throw error;
+      await scheduleAPI.create({
+        event_type: 'recurring',
+        day_of_week: parseInt(newEvent.dayOfWeek),
+        start_time: newEvent.startTime,
+        end_time: newEvent.endTime
+      });
 
       toast({
         title: "Succès",
@@ -115,12 +103,7 @@ export const ScheduleManager = () => {
 
   const handleDeleteEvent = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from('scheduled_events')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await scheduleAPI.delete(id);
 
       toast({
         title: "Succès",
