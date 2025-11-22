@@ -1,0 +1,24 @@
+{
+  "name": "Radio Kambove Tabernacle",
+  "short_name": "Radio KT",
+  "description": "Système de gestion de webradio pour l'église Kambove Tabernacle",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#1a3a52",
+  "theme_color": "#1a3a52",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

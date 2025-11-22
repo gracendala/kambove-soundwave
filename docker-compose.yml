@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: radio_postgres
+    environment:
+      POSTGRES_DB: radio_kambove
+      POSTGRES_USER: radio
+      POSTGRES_PASSWORD: radio_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - radio_network
+    restart: unless-stopped
+
+  api:
+    build: ./backend
+    container_name: radio_api
+    ports:
+      - "3000:3000"
+    environment:
+      - DB_HOST=postgres
+      - DB_PORT=5432
+      - DB_NAME=radio_kambove
+      - DB_USER=radio
+      - DB_PASSWORD=radio_password
+      - JWT_SECRET=votre_secret_jwt_super_securise
+    volumes:
+      - ./backend/uploads:/app/uploads
+    depends_on:
+      - postgres
+    networks:
+      - radio_network
+    restart: unless-stopped
+
+  icecast:
+    image: moul/icecast
+    container_name: radio_icecast
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./icecast/icecast.xml:/etc/icecast2/icecast.xml
+    networks:
+      - radio_network
+    restart: unless-stopped
+
+  liquidsoap:
+    build: ./liquidsoap
+    container_name: radio_liquidsoap
+    volumes:
+      - ./liquidsoap/radio.liq:/etc/liquidsoap/radio.liq
+      - ./playlists:/playlists
+      - ./backend/uploads:/uploads
+    depends_on:
+      - icecast
+      - api
+    networks:
+      - radio_network
+    restart: unless-stopped
+
+  web:
+    image: nginx:alpine
+    container_name: radio_web
+    ports:
+      - "80:80"
+    volumes:
+      - ./web/dist:/usr/share/nginx/html
+      - ./nginx.conf:/etc/nginx/conf.d/default.conf
+    depends_on:
+      - api
+    networks:
+      - radio_network
+    restart: unless-stopped
+
+networks:
+  radio_network:
+    driver: bridge
+
+volumes:
+  postgres_data:
