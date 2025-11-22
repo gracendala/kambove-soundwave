@@ -3,12 +3,13 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { Music, Plus, Trash2, Loader2 } from "lucide-react";
+import { Music, Plus, Trash2, Loader2, Eye } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/lib/supabase";
 import { useToast } from "@/hooks/use-toast";
+import { PlaylistDetail } from "./PlaylistDetail";
 
 interface Playlist {
   id: string;
@@ -23,7 +24,19 @@ export const PlaylistManager = () => {
   const [newPlaylistName, setNewPlaylistName] = useState("");
   const [newPlaylistDesc, setNewPlaylistDesc] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedPlaylistId, setSelectedPlaylistId] = useState<string | null>(null);
+  const [selectedPlaylistName, setSelectedPlaylistName] = useState("");
   const { toast } = useToast();
+
+  if (selectedPlaylistId) {
+    return (
+      <PlaylistDetail
+        playlistId={selectedPlaylistId}
+        playlistName={selectedPlaylistName}
+        onBack={() => setSelectedPlaylistId(null)}
+      />
+    );
+  }
 
   useEffect(() => {
     loadPlaylists();
@@ -199,7 +212,19 @@ export const PlaylistManager = () => {
                     <Button
                       size="icon"
                       variant="outline"
+                      onClick={() => {
+                        setSelectedPlaylistId(playlist.id);
+                        setSelectedPlaylistName(playlist.name);
+                      }}
+                      title="Voir les chansons"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      size="icon"
+                      variant="outline"
                       onClick={() => handleDeletePlaylist(playlist.id)}
+                      title="Supprimer"
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
