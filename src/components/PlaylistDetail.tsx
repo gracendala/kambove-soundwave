@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Music, Trash2, Loader2, ArrowLeft, Play, GripVertical } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/lib/supabase";
+import { playlistsAPI } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 import { AudioPlayer } from "./AudioPlayer";
 
@@ -42,24 +42,7 @@ export const PlaylistDetail = ({ playlistId, playlistName, onBack }: PlaylistDet
   const loadPlaylistSongs = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('playlist_songs')
-        .select(`
-          id,
-          position,
-          song_id,
-          songs (
-            id,
-            title,
-            artist,
-            file_path,
-            duration
-          )
-        `)
-        .eq('playlist_id', playlistId)
-        .order('position');
-
-      if (error) throw error;
+      const data = await playlistsAPI.getSongs(playlistId);
       setSongs(data || []);
     } catch (error: any) {
       toast({
@@ -72,16 +55,11 @@ export const PlaylistDetail = ({ playlistId, playlistName, onBack }: PlaylistDet
     }
   };
 
-  const handleRemoveSong = async (playlistSongId: string) => {
+  const handleRemoveSong = async (playlistSongId: string, songId: string) => {
     if (!confirm("Êtes-vous sûr de vouloir retirer cette chanson de la playlist ?")) return;
 
     try {
-      const { error } = await supabase
-        .from('playlist_songs')
-        .delete()
-        .eq('id', playlistSongId);
-
-      if (error) throw error;
+      await playlistsAPI.removeSong(playlistId, songId);
 
       toast({
         title: "Succès",
@@ -192,7 +170,7 @@ export const PlaylistDetail = ({ playlistId, playlistName, onBack }: PlaylistDet
                         <Button
                           size="icon"
                           variant="outline"
-                          onClick={() => handleRemoveSong(playlistSong.id)}
+                          onClick={() => handleRemoveSong(playlistSong.id, playlistSong.song_id)}
                           title="Retirer de la playlist"
                         >
                           <Trash2 className="h-4 w-4" />

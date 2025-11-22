@@ -1,12 +1,17 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase, getUserRoles, signOut } from '@/lib/supabase';
-import { User, Session } from '@supabase/supabase-js';
+import { authAPI } from '@/services/api';
+
+interface User {
+  id: string;
+  username: string;
+  email?: string;
+  roles: string[];
+}
 
 interface AuthContextType {
   user: User | null;
-  session: Session | null;
   login: (email: string, password: string) => Promise<void>;
-  logout: () => Promise<void>;
+  logout: () => void;
   isAuthenticated: boolean;
   isAdmin: boolean;
   userRoles: string[];
@@ -17,75 +22,36 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [session, setSession] = useState<Session | null>(null);
   const [userRoles, setUserRoles] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Set up auth state listener FIRST
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        // Fetch user roles when authenticated
-        if (session?.user) {
-          setTimeout(async () => {
-            try {
-              const roles = await getUserRoles(session.user.id);
-              setUserRoles(roles);
-            } catch (error) {
-              console.error('Error fetching user roles:', error);
-              setUserRoles([]);
-            }
-          }, 0);
-        } else {
-          setUserRoles([]);
-        }
-        
-        setLoading(false);
-      }
-    );
-
-    // THEN check for existing session
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        try {
-          const roles = await getUserRoles(session.user.id);
-          setUserRoles(roles);
-        } catch (error) {
-          console.error('Error fetching user roles:', error);
-          setUserRoles([]);
-        }
-      }
-      
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+    // Check for existing token on mount
+    const currentUser = authAPI.getCurrentUser();
+    if (currentUser) {
+      setUser(currentUser);
+      setUserRoles(currentUser.roles || []);
+    }
+    setLoading(false);
   }, []);
 
   const login = async (email: string, password: string) => {
-    const { data, error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const data = await authAPI.login(email, password);
     
-    if (error) throw error;
+    const userData: User = {
+      id: data.user.id,
+      username: data.user.username,
+      email: data.user.email,
+      roles: data.user.roles || [],
+    };
     
-    if (data.user) {
-      const roles = await getUserRoles(data.user.id);
-      setUserRoles(roles);
-    }
+    setUser(userData);
+    setUserRoles(userData.roles);
   };
 
-  const logout = async () => {
-    await signOut();
+  const logout = () => {
+    authAPI.logout();
     setUser(null);
-    setSession(null);
     setUserRoles([]);
   };
 
@@ -93,7 +59,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     <AuthContext.Provider
       value={{
         user,
-        session,
         login,
         logout,
         isAuthenticated: !!user,

@@ -7,7 +7,7 @@ import { Music, Plus, Trash2, Loader2, Eye } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/lib/supabase";
+import { playlistsAPI } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
 import { PlaylistDetail } from "./PlaylistDetail";
 
@@ -35,12 +35,7 @@ export const PlaylistManager = () => {
   const loadPlaylists = async () => {
     try {
       setLoading(true);
-      const { data, error } = await supabase
-        .from('playlists')
-        .select('*')
-        .order('created_at', { ascending: false });
-      
-      if (error) throw error;
+      const data = await playlistsAPI.getAll();
       setPlaylists(data || []);
     } catch (error: any) {
       toast({
@@ -64,17 +59,7 @@ export const PlaylistManager = () => {
     }
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      
-      const { error } = await supabase
-        .from('playlists')
-        .insert([{
-          name: newPlaylistName,
-          description: newPlaylistDesc || null,
-          created_by: user?.id
-        }]);
-
-      if (error) throw error;
+      await playlistsAPI.create(newPlaylistName, newPlaylistDesc || undefined);
 
       toast({
         title: "Succès",
@@ -97,12 +82,7 @@ export const PlaylistManager = () => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cette playlist ?")) return;
 
     try {
-      const { error } = await supabase
-        .from('playlists')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
+      await playlistsAPI.delete(id);
 
       toast({
         title: "Succès",
