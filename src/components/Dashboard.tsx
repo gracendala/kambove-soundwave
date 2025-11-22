@@ -2,16 +2,124 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Radio, Music, Calendar, Users, Play, Pause, Volume2, BarChart3, Activity, TrendingUp } from "lucide-react";
-import { useState } from "react";
+import { Radio, Music, Calendar, Users, Play, Pause, Volume2, BarChart3, Activity, TrendingUp, Loader2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
+import { useToast } from "@/hooks/use-toast";
+
+interface DashboardStats {
+  totalPlaylists: number;
+  totalSongs: number;
+  upcomingEvents: number;
+  currentListeners: number;
+  topSongs: Array<{
+    id: string;
+    title: string;
+    artist: string;
+    playCount: number;
+  }>;
+}
 
 export const Dashboard = () => {
   const [isLive, setIsLive] = useState(true);
-  const [currentTrack] = useState({
-    title: "Amazing Grace",
-    artist: "Chœur de Kambove Tabernacle",
-    duration: "3:45"
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalPlaylists: 0,
+    totalSongs: 0,
+    upcomingEvents: 0,
+    currentListeners: 0,
+    topSongs: []
   });
+  const { toast } = useToast();
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+
+      // Get total playlists
+      const { count: playlistCount } = await supabase
+        .from('playlists')
+        .select('*', { count: 'exact', head: true });
+
+      // Get total songs
+      const { count: songCount } = await supabase
+        .from('songs')
+        .select('*', { count: 'exact', head: true });
+
+      // Get upcoming events (next 7 days)
+      const today = new Date().toISOString().split('T')[0];
+      const { count: eventCount } = await supabase
+        .from('scheduled_events')
+        .select('*', { count: 'exact', head: true })
+        .or(`scheduled_date.gte.${today},event_type.eq.recurring`);
+
+      // Get current listeners (latest from play_stats)
+      const { data: latestStats } = await supabase
+        .from('play_stats')
+        .select('listener_count')
+        .order('played_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      // Get top songs by play count
+      const { data: topSongsData } = await supabase
+        .from('play_stats')
+        .select(`
+          song_id,
+          songs (
+            id,
+            title,
+            artist
+          )
+        `)
+        .not('song_id', 'is', null)
+        .order('played_at', { ascending: false })
+        .limit(100);
+
+      // Count plays per song
+      const songPlayCounts = new Map<string, { title: string; artist: string; count: number }>();
+      topSongsData?.forEach((stat: any) => {
+        if (stat.songs) {
+          const song = stat.songs;
+          const existing = songPlayCounts.get(song.id) || { title: song.title, artist: song.artist || 'Artiste inconnu', count: 0 };
+          songPlayCounts.set(song.id, { ...existing, count: existing.count + 1 });
+        }
+      });
+
+      const topSongs = Array.from(songPlayCounts.entries())
+        .map(([id, data]) => ({ id, ...data, playCount: data.count }))
+        .sort((a, b) => b.playCount - a.playCount)
+        .slice(0, 3);
+
+      setStats({
+        totalPlaylists: playlistCount || 0,
+        totalSongs: songCount || 0,
+        upcomingEvents: eventCount || 0,
+        currentListeners: latestStats?.listener_count || 0,
+        topSongs
+      });
+    } catch (error: any) {
+      toast({
+        variant: "destructive",
+        title: "Erreur",
+        description: error.message || "Impossible de charger les données"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-accent" />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
@@ -48,24 +156,24 @@ export const Dashboard = () => {
 
         {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6 animate-in fade-in duration-300">
-          {/* Current Track Card */}
+          {/* Info Card */}
           <Card variant="elevated" className="gradient-divine">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Music className="h-5 w-5 text-accent" />
-                Lecture en Cours
+                <Radio className="h-5 w-5 text-accent" />
+                Statut de la Radio
               </CardTitle>
             </CardHeader>
             <CardContent>
               <div className="flex items-center justify-between p-4 bg-background/50 rounded-lg border border-border/30">
                 <div className="flex items-center gap-4">
                   <div className="h-16 w-16 rounded-lg bg-accent/10 flex items-center justify-center">
-                    <Music className="h-8 w-8 text-accent animate-pulse" />
+                    <Radio className="h-8 w-8 text-accent animate-pulse" />
                   </div>
                   <div>
-                    <p className="font-bold text-lg text-foreground">{currentTrack.title}</p>
-                    <p className="text-sm text-muted-foreground">{currentTrack.artist}</p>
-                    <p className="text-xs text-muted-foreground mt-1">Durée: {currentTrack.duration}</p>
+                    <p className="font-bold text-lg text-foreground">Radio Kambove Tabernacle</p>
+                    <p className="text-sm text-muted-foreground">Diffusion en continu</p>
+                    <p className="text-xs text-muted-foreground mt-1">{stats.totalSongs} fichiers audio</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -84,26 +192,23 @@ export const Dashboard = () => {
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
             <Card variant="elevated" className="hover:scale-105">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Auditeurs Actuels</CardTitle>
+                <CardTitle className="text-sm font-medium">Auditeurs</CardTitle>
                 <Users className="h-5 w-5 text-accent" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-accent">247</div>
-                <p className="text-xs text-muted-foreground flex items-center gap-1 mt-1">
-                  <TrendingUp className="h-3 w-3" />
-                  +12% vs hier
-                </p>
+                <div className="text-3xl font-bold text-accent">{stats.currentListeners}</div>
+                <p className="text-xs text-muted-foreground">Dernière écoute</p>
               </CardContent>
             </Card>
 
             <Card variant="elevated" className="hover:scale-105">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Playlists Actives</CardTitle>
+                <CardTitle className="text-sm font-medium">Playlists</CardTitle>
                 <Music className="h-5 w-5 text-accent" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-accent">12</div>
-                <p className="text-xs text-muted-foreground">+2 depuis hier</p>
+                <div className="text-3xl font-bold text-accent">{stats.totalPlaylists}</div>
+                <p className="text-xs text-muted-foreground">Total créées</p>
               </CardContent>
             </Card>
 
@@ -113,19 +218,19 @@ export const Dashboard = () => {
                 <Calendar className="h-5 w-5 text-accent" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-accent">8</div>
-                <p className="text-xs text-muted-foreground">Cette semaine</p>
+                <div className="text-3xl font-bold text-accent">{stats.upcomingEvents}</div>
+                <p className="text-xs text-muted-foreground">À venir</p>
               </CardContent>
             </Card>
 
             <Card variant="elevated" className="hover:scale-105">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Uptime</CardTitle>
+                <CardTitle className="text-sm font-medium">Fichiers Audio</CardTitle>
                 <Activity className="h-5 w-5 text-accent" />
               </CardHeader>
               <CardContent>
-                <div className="text-3xl font-bold text-accent">99.8%</div>
-                <p className="text-xs text-muted-foreground">30 derniers jours</p>
+                <div className="text-3xl font-bold text-accent">{stats.totalSongs}</div>
+                <p className="text-xs text-muted-foreground">Dans la bibliothèque</p>
               </CardContent>
             </Card>
           </div>
@@ -165,27 +270,24 @@ export const Dashboard = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3">
-                <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                  <div className="h-8 w-8 rounded bg-accent/20 flex items-center justify-center text-accent font-bold">1</div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Amazing Grace</p>
-                    <p className="text-xs text-muted-foreground">2,845 écoutes</p>
+                {stats.topSongs.length > 0 ? (
+                  stats.topSongs.map((song, index) => (
+                    <div key={song.id} className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
+                      <div className="h-8 w-8 rounded bg-accent/20 flex items-center justify-center text-accent font-bold">
+                        {index + 1}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{song.title}</p>
+                        <p className="text-xs text-muted-foreground">{song.playCount} écoute{song.playCount > 1 ? 's' : ''}</p>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <Music className="h-12 w-12 mx-auto mb-2 opacity-20" />
+                    <p className="text-sm">Aucune statistique disponible</p>
                   </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                  <div className="h-8 w-8 rounded bg-accent/20 flex items-center justify-center text-accent font-bold">2</div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Prédication du Dimanche</p>
-                    <p className="text-xs text-muted-foreground">1,923 écoutes</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3 p-3 bg-muted/30 rounded-lg">
-                  <div className="h-8 w-8 rounded bg-accent/20 flex items-center justify-center text-accent font-bold">3</div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">Chant de Louange</p>
-                    <p className="text-xs text-muted-foreground">1,654 écoutes</p>
-                  </div>
-                </div>
+                )}
               </CardContent>
             </Card>
           </div>
