@@ -98,7 +98,7 @@ export const UsersManagement = () => {
         toast({
           variant: "destructive",
           title: "Erreur de validation",
-          description: error.errors[0].message
+          description: error.issues[0].message
         });
       } else {
         toast({

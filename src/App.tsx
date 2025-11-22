@@ -15,7 +15,13 @@ import { Button } from "@/components/ui/button";
 import { LogOut, Radio, Music, Calendar, Settings as SettingsIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 function AppContent() {
   const { isAuthenticated, logout, user } = useAuth();
