@@ -416,41 +416,49 @@ export const AudioLibrary = () => {
                 {filteredSongs.map((song, index) => (
                   <div
                     key={song.id}
-                    className="group flex items-center gap-3 px-4 py-2.5 hover:bg-accent/5 transition-colors"
+                    className="group hover:bg-accent/5 transition-colors"
                   >
-                    <span className="text-xs text-muted-foreground/70 w-10 flex-shrink-0">
-                      {index + 1}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">{song.title}</p>
-                      {song.artist && (
-                        <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
-                      )}
-                    </div>
-                    {song.duration && (
-                      <span className="text-xs text-muted-foreground w-20 hidden sm:block flex-shrink-0">
-                        {formatDuration(song.duration)}
+                    <div className="flex items-center gap-3 px-4 py-2.5">
+                      <span className="text-xs text-muted-foreground/70 w-10 flex-shrink-0">
+                        {index + 1}
                       </span>
-                    )}
-                    <div className="flex items-center gap-0.5 w-24 justify-end flex-shrink-0">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => openAddToPlaylistDialog(song.id)}
-                        title="Ajouter à une playlist"
-                        className="h-7 w-7 opacity-0 group-hover:opacity-100"
-                      >
-                        <ListPlus className="h-3.5 w-3.5" />
-                      </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => handleDeleteSong(song.id, song.file_path)}
-                        title="Supprimer"
-                        className="h-7 w-7 text-destructive hover:text-destructive opacity-0 group-hover:opacity-100"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{song.title}</p>
+                        {song.artist && (
+                          <p className="text-xs text-muted-foreground truncate">{song.artist}</p>
+                        )}
+                      </div>
+                      {song.duration && (
+                        <span className="text-xs text-muted-foreground w-20 hidden sm:block flex-shrink-0">
+                          {formatDuration(song.duration)}
+                        </span>
+                      )}
+                      <div className="flex items-center gap-0.5 w-24 justify-end flex-shrink-0">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => openAddToPlaylistDialog(song.id)}
+                          title="Ajouter à une playlist"
+                          className="h-7 w-7 opacity-0 group-hover:opacity-100"
+                        >
+                          <ListPlus className="h-3.5 w-3.5" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => handleDeleteSong(song.id, song.file_path)}
+                          title="Supprimer"
+                          className="h-7 w-7 text-destructive hover:text-destructive opacity-0 group-hover:opacity-100"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="px-4 pb-2">
+                      <AudioPlayer 
+                        filePath={song.file_path} 
+                        title={song.title}
+                      />
                     </div>
                   </div>
                 ))}
