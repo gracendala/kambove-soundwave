@@ -17,6 +17,7 @@
     "dotenv": "^16.4.5",
     "music-metadata": "^8.1.4",
     "fluent-ffmpeg": "^2.1.2",
-    "nodemailer": "^6.9.8"
+    "nodemailer": "^6.9.8",
+    "@supabase/supabase-js": "^2.84.0"
   }
 }

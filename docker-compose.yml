@@ -26,6 +26,8 @@ services:
       - DB_USER=radio
       - DB_PASSWORD=radio_password
       - JWT_SECRET=votre_secret_jwt_super_securise
+      - SUPABASE_URL=https://kgnpsyzmjzdeywgttfra.supabase.co
+      - SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtnbnBzeXptanpkZXl3Z3R0ZnJhIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjM4MDgwNjQsImV4cCI6MjA3OTM4NDA2NH0.BB5gv851JDGsP0RH3LMwu3nMyRSJrEi33PgtWGo9pxM
     volumes:
       - ./backend/uploads:/app/uploads
     depends_on:
