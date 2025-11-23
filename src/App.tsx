@@ -12,6 +12,7 @@ import Schedule from "./pages/Schedule";
 import Settings from "./pages/Settings";
 import Login from "./pages/Login";
 import Install from "./pages/Install";
+import Listen from "./pages/Listen";
 import NotFound from "./pages/NotFound";
 import { Button } from "@/components/ui/button";
 import { LogOut, Radio, Music, Calendar, Settings as SettingsIcon, Library as LibraryIcon } from "lucide-react";
@@ -38,11 +39,13 @@ function AppContent() {
     { path: "/settings", label: "Paramètres", icon: SettingsIcon },
   ];
 
-  // Show login page layout for unauthenticated users
-  if (!isAuthenticated && location.pathname === '/login') {
+  // Show pages without authentication (login and public listen page)
+  if (!isAuthenticated && (location.pathname === '/login' || location.pathname === '/listen')) {
     return (
       <Routes>
         <Route path="/login" element={<Login />} />
+        <Route path="/listen" element={<Listen />} />
+        <Route path="*" element={<Navigate to="/login" replace />} />
       </Routes>
     );
   }
@@ -103,6 +106,7 @@ function AppContent() {
       <main className="flex-1 container mx-auto px-6 py-8 overflow-auto">
         <Routes>
           <Route path="/login" element={<Login />} />
+          <Route path="/listen" element={<Listen />} />
           <Route path="/install" element={<Install />} />
           <Route path="/" element={<ProtectedRoute><Index /></ProtectedRoute>} />
           <Route path="/library" element={<ProtectedRoute><Library /></ProtectedRoute>} />
