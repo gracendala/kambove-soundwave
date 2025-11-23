@@ -6,6 +6,7 @@ import { Radio, Music, Calendar, Users, Play, Pause, Volume2, BarChart3, Activit
 import { useState, useEffect } from "react";
 import { playlistsAPI, songsAPI, scheduleAPI, statsAPI } from "@/services/api";
 import { useToast } from "@/hooks/use-toast";
+import LiveStreamPlayer from "@/components/LiveStreamPlayer";
 
 interface DashboardStats {
   totalPlaylists: number;
@@ -270,6 +271,8 @@ export const Dashboard = () => {
 
         {/* Controls Tab */}
         <TabsContent value="controls" className="space-y-6 animate-in fade-in duration-300">
+          <LiveStreamPlayer />
+          
           <Card variant="elevated" className="gradient-divine">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">

@@ -10,7 +10,14 @@ import fs from 'fs/promises';
 const router = express.Router();
 
 const storage = multer.diskStorage({
-  destination: 'uploads/',
+  destination: async (req, file, cb) => {
+    try {
+      await fs.mkdir('uploads', { recursive: true });
+      cb(null, 'uploads/');
+    } catch (error) {
+      cb(error, 'uploads/');
+    }
+  },
   filename: (req, file, cb) => {
     const uniqueName = `${Date.now()}-${file.originalname}`;
     cb(null, uniqueName);

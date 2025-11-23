@@ -20,6 +20,35 @@ router.post('/play', async (req, res) => {
   }
 });
 
+// Alias pour /current qui pointe vers /summary
+router.get('/current', async (req, res) => {
+  try {
+    const totalSongs = await pool.query('SELECT COUNT(*) FROM songs');
+    const totalPlays = await pool.query('SELECT COUNT(*) FROM listen_stats WHERE played_at > NOW() - INTERVAL \'24 hours\'');
+    const currentListeners = await pool.query('SELECT COALESCE(MAX(listener_count), 0) as count FROM listen_stats WHERE played_at > NOW() - INTERVAL \'5 minutes\'');
+    
+    const topSongs = await pool.query(`
+      SELECT s.title, s.artist, COUNT(ls.id) as play_count
+      FROM songs s
+      LEFT JOIN listen_stats ls ON s.id = ls.song_id
+      WHERE ls.played_at > NOW() - INTERVAL '7 days'
+      GROUP BY s.id, s.title, s.artist
+      ORDER BY play_count DESC
+      LIMIT 10
+    `);
+
+    res.json({
+      totalSongs: parseInt(totalSongs.rows[0].count),
+      playsLast24h: parseInt(totalPlays.rows[0].count),
+      currentListeners: parseInt(currentListeners.rows[0].count),
+      topSongs: topSongs.rows
+    });
+  } catch (error) {
+    console.error('Erreur get stats:', error);
+    res.status(500).json({ error: 'Erreur serveur' });
+  }
+});
+
 router.get('/summary', async (req, res) => {
   try {
     const totalSongs = await pool.query('SELECT COUNT(*) FROM songs');
