@@ -27,21 +27,21 @@ export const AudioPlayer = ({ filePath, title, compact = false }: AudioPlayerPro
   const loadAudioUrl = () => {
     try {
       setIsLoading(true);
-      const { data } = supabase.storage
-        .from('audio-files')
-        .getPublicUrl(filePath);
 
-      if (data?.publicUrl) {
-        setAudioUrl(data.publicUrl);
-      } else {
-        console.error("Aucune URL publique trouvée pour l'audio", filePath);
-      }
+      // On construit manuellement l'URL publique pour éviter les problèmes de format
+      const baseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const encodedPath = encodeURIComponent(filePath);
+      const publicUrl = `${baseUrl}/storage/v1/object/public/audio-files/${encodedPath}`;
+
+      console.log("[AudioPlayer] Using manual public URL", { filePath, publicUrl });
+      setAudioUrl(publicUrl);
     } catch (error) {
       console.error("Erreur lors du chargement de l'audio:", error);
     } finally {
       setIsLoading(false);
     }
   };
+
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
@@ -50,14 +50,14 @@ export const AudioPlayer = ({ filePath, title, compact = false }: AudioPlayerPro
     const updateDuration = () => setDuration(audio.duration);
     const handleEnded = () => setIsPlaying(false);
 
-    audio.addEventListener('timeupdate', updateTime);
-    audio.addEventListener('loadedmetadata', updateDuration);
-    audio.addEventListener('ended', handleEnded);
+    audio.addEventListener("timeupdate", updateTime);
+    audio.addEventListener("loadedmetadata", updateDuration);
+    audio.addEventListener("ended", handleEnded);
 
     return () => {
-      audio.removeEventListener('timeupdate', updateTime);
-      audio.removeEventListener('loadedmetadata', updateDuration);
-      audio.removeEventListener('ended', handleEnded);
+      audio.removeEventListener("timeupdate", updateTime);
+      audio.removeEventListener("loadedmetadata", updateDuration);
+      audio.removeEventListener("ended", handleEnded);
     };
   }, [audioUrl]);
 
@@ -92,7 +92,7 @@ export const AudioPlayer = ({ filePath, title, compact = false }: AudioPlayerPro
   const toggleMute = () => {
     const audio = audioRef.current;
     if (!audio) return;
-    
+
     if (isMuted) {
       audio.volume = volume;
       setIsMuted(false);
@@ -106,7 +106,7 @@ export const AudioPlayer = ({ filePath, title, compact = false }: AudioPlayerPro
     if (isNaN(time)) return "0:00";
     const minutes = Math.floor(time / 60);
     const seconds = Math.floor(time % 60);
-    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+    return `${minutes}:${seconds.toString().padStart(2, "0")}`;
   };
 
   if (compact) {
@@ -140,7 +140,7 @@ export const AudioPlayer = ({ filePath, title, compact = false }: AudioPlayerPro
   return (
     <div className="w-full space-y-3 p-4 bg-muted/30 rounded-lg border border-border/50">
       {audioUrl && <audio ref={audioRef} src={audioUrl} />}
-      
+
       <div className="flex items-center gap-3">
         <Button
           size="icon"
