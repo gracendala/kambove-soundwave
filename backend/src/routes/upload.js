@@ -6,8 +6,14 @@ import ffmpeg from 'fluent-ffmpeg';
 import { pool } from '../db/init.js';
 import { authMiddleware } from './auth.js';
 import fs from 'fs/promises';
+import { createClient } from '@supabase/supabase-js';
 
 const router = express.Router();
+
+// Initialiser Supabase client
+const supabaseUrl = process.env.SUPABASE_URL || process.env.VITE_SUPABASE_URL;
+const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 const storage = multer.diskStorage({
   destination: async (req, file, cb) => {
@@ -77,6 +83,25 @@ router.post('/', upload.single('audio'), async (req, res) => {
     // Extraire les métadonnées
     const metadata = await parseFile(convertedPath);
     
+    // Upload vers Supabase Storage
+    const fileBuffer = await fs.readFile(convertedPath);
+    const fileName = `uploads/${Date.now()}-${path.basename(convertedPath)}`;
+    
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from('audio-files')
+      .upload(fileName, fileBuffer, {
+        contentType: 'audio/mpeg',
+        upsert: false
+      });
+
+    if (uploadError) {
+      throw new Error(`Erreur Supabase: ${uploadError.message}`);
+    }
+
+    // Supprimer le fichier local après upload
+    await fs.unlink(convertedPath);
+    
+    // Enregistrer dans la base de données avec le chemin Supabase
     const result = await pool.query(
       'INSERT INTO songs (title, artist, album, duration, file_path) VALUES ($1, $2, $3, $4, $5) RETURNING *',
       [
@@ -84,7 +109,7 @@ router.post('/', upload.single('audio'), async (req, res) => {
         metadata.common.artist || 'Artiste inconnu',
         metadata.common.album || '',
         Math.floor(metadata.format.duration || 0),
-        convertedPath
+        fileName  // Chemin dans Supabase Storage
       ]
     );
 
@@ -110,7 +135,14 @@ router.delete('/songs/:id', async (req, res) => {
     const result = await pool.query('SELECT file_path FROM songs WHERE id = $1', [req.params.id]);
     
     if (result.rows.length > 0) {
-      await fs.unlink(result.rows[0].file_path).catch(() => {});
+      const filePath = result.rows[0].file_path;
+      
+      // Supprimer de Supabase Storage
+      await supabase.storage
+        .from('audio-files')
+        .remove([filePath]);
+      
+      // Supprimer de la base de données
       await pool.query('DELETE FROM songs WHERE id = $1', [req.params.id]);
     }
     
