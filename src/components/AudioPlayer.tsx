@@ -22,31 +22,26 @@ export const AudioPlayer = ({ filePath, title, compact = false }: AudioPlayerPro
 
   useEffect(() => {
     loadAudioUrl();
-    return () => {
-      if (audioUrl) {
-        URL.revokeObjectURL(audioUrl);
-      }
-    };
   }, [filePath]);
 
-  const loadAudioUrl = async () => {
+  const loadAudioUrl = () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase.storage
+      const { data } = supabase.storage
         .from('audio-files')
-        .download(filePath);
+        .getPublicUrl(filePath);
 
-      if (error) throw error;
-
-      const url = URL.createObjectURL(data);
-      setAudioUrl(url);
+      if (data?.publicUrl) {
+        setAudioUrl(data.publicUrl);
+      } else {
+        console.error("Aucune URL publique trouvée pour l'audio", filePath);
+      }
     } catch (error) {
       console.error("Erreur lors du chargement de l'audio:", error);
     } finally {
       setIsLoading(false);
     }
   };
-
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
