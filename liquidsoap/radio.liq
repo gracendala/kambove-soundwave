@@ -14,11 +14,17 @@ principale = playlist(
 # Musique de secours (silence si pas de fichiers)
 secours = single("/playlists/secours.mp3")
 
-# Fallback: principale en priorité, sinon secours
+# Silence de secours si aucune source n'est disponible
+emergency = blank()
+
+# Fallback: principale en priorité, sinon secours, sinon silence
 radio = fallback(
   track_sensitive=false,
-  [principale, secours]
+  [principale, secours, emergency]
 )
+
+# Rendre la source infallible
+radio = mksafe(radio)
 
 # Normalisation audio
 radio = normalize(radio)

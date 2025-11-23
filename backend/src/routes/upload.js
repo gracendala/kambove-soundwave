@@ -27,15 +27,23 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /mp3|wav|flac|ogg|m4a/;
-    const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
-    const mimetype = allowedTypes.test(file.mimetype);
+    const allowedExtensions = /\.(mp3|wav|flac|ogg|m4a)$/i;
+    const allowedMimeTypes = ['audio/mpeg', 'audio/mp3', 'audio/wav', 'audio/wave', 'audio/x-wav', 
+                               'audio/flac', 'audio/ogg', 'audio/mp4', 'audio/m4a', 'audio/x-m4a',
+                               'application/octet-stream']; // Parfois les fichiers audio sont envoyés comme octet-stream
     
-    if (extname && mimetype) {
+    const hasValidExtension = allowedExtensions.test(file.originalname.toLowerCase());
+    const hasValidMimeType = allowedMimeTypes.includes(file.mimetype.toLowerCase());
+    
+    // Accepter si l'extension est valide (priorité sur mimetype car parfois incorrect)
+    if (hasValidExtension) {
       cb(null, true);
     } else {
-      cb(new Error('Seuls les fichiers audio sont autorisés'));
+      cb(new Error('Seuls les fichiers audio sont autorisés (mp3, wav, flac, ogg, m4a)'));
     }
+  },
+  limits: {
+    fileSize: 100 * 1024 * 1024 // 100 MB max
   }
 });
 
