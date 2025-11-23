@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
-import { Cross, Loader2 } from 'lucide-react';
+import { Cross, Loader2, Radio } from 'lucide-react';
 import { authAPI } from '@/services/api';
 
 const Login = () => {
@@ -148,6 +148,19 @@ const Login = () => {
               >
                 {isSignUp ? 'Déjà un compte ? Se connecter' : 'Pas de compte ? S\'inscrire'}
               </Button>
+            </div>
+
+            <div className="text-center mt-2 pt-4 border-t border-border/30">
+              <Link to="/listen">
+                <Button
+                  type="button"
+                  variant="outline"
+                  className="gap-2"
+                >
+                  <Radio className="h-4 w-4" />
+                  Écouter sans se connecter
+                </Button>
+              </Link>
             </div>
           </form>
         </CardContent>
